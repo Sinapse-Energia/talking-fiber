@@ -9,7 +9,7 @@ The firmware it is based in an already working code for M3 MCUs with an API Engi
 
 # Resume of tasks to be performed
 
-1. Adapt existing M3 code to new talking fiber board. Normally it is only a GPIO modification
+1. Adapt existing M3 code to new talking fiber board. Normally it is only a GPIO modification. The board connections are specified in the HW-FW document available in the project
 2. Development of SB function in order to read status of the fiber
 3. To create a new main that provides the required algorith. Basically read SB and publish status. TODO: Flow diagram 
 4. Optimize the behaviour to consume the minimum power as possible
