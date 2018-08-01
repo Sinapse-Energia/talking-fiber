@@ -14,15 +14,7 @@ The firmware it is based in an already working code for M3 MCUs with an API Engi
 3. To create a new main that provides the required algorith. Basically read SB and publish status. 
 4. Optimize the behaviour to consume the minimum power as possible
 
-# Overview of the system behavior
+# Functional requirements
 
-## State diagram
-
-![State diagram](https://github.com/Sinapse-Energia/talking-fiber/blob/master/Talking%20%20fiber%20state%20diagram.png)
-
-## Timing diagram
-
-![Timing diagram](https://github.com/Sinapse-Energia/talking-fiber/blob/master/Talking%20fiber%20timing%20diagram.png)
-
-
+See Wiki
 
