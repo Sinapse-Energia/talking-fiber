@@ -21,6 +21,7 @@
 
 
 
+#define MAXLENGTH	128
 
 //	class CFrame
 
@@ -62,10 +63,8 @@ int		PostAction(CFrame *x) {
 	while (actions[i].id ) {
 		const char *id = actions[i].id;
 		if (!strcmp(id, x->Id()))
-			if (actions[i].post){
-				int rc = actions[i].post();
-				return rc;
-			}
+			if (actions[i].post)
+				return actions[i].post();
 			else
 				return 0;
 		else
@@ -76,7 +75,6 @@ int		PostAction(CFrame *x) {
 
 // Read one CSV line of up to FOUR FIELDS (ID, TEMPLATE, NAME, REPLAY)
 //	without caring about delimited fields
-/*
 CFrame	**ReadFrames1(char **lineas) {
 	int numero = 0;
 	// first get the number of lines
@@ -116,7 +114,6 @@ CFrame	**ReadFrames1(char **lineas) {
 
 	return result;
 }
-*/
 
 // Read one CSV line of up to FIVE FIELDS
 //	(ID, TEMPLATE, NAME, TOPIC, REPLAY)
@@ -159,7 +156,9 @@ CFrame	**ReadFrames2(const char **lineas) {
 	return result;
 }
 
-/**
+
+
+
 int	 ReadMetadata0(char *dominioIn, char *dominioOut){
 
 	static CFrame  *OUTAPIS[] = {
@@ -178,7 +177,7 @@ int	 ReadMetadata0(char *dominioIn, char *dominioOut){
 	CFrame::InAPI  =  INAPIS;
 	return 1;
 }
-**/
+
 
 // This is a PROVISIONAL way of Handling incoming messages, and their potential responses
 char	*ProcessMessage (char *messagein) {
@@ -193,25 +192,16 @@ char	*ProcessMessage (char *messagein) {
 //		request->Pre();
 		PreAction(request);
 		if (request->Execute (messagein)) {
-			int rc = PostAction(request);
-//			request->Post();
-			if (rc >= 0){
-				CFrame *reply = request->Replay();
-				if (reply) {
-					// incoming message has an immediate  reply
-
-					char	*messageout = reply->Build();
-					return messageout;
-				}
-				else {
-					// mssg has no reply
-					return NULL;
-				}
+		PostAction(request);
+	//		request->Post();
+			CFrame *replay = request->Replay();
+			if (replay) {
+				// incoming message has an immediate  reply
+				char	*messageout = replay->Build();
+				return messageout;
 			}
 			else {
-				// Command "refused"
-				// return "000;REFUSED by APP"; // OJO MUY PROVISIONAL
-				LogFrame("BAD"); // PROVISIONAL de momento...
+				// mssg has no reply
 				return NULL;
 			}
 		}
@@ -223,14 +213,9 @@ char	*ProcessMessage (char *messagein) {
 	else {
 		// this is a placeholder for ad-hoc message processing
 		// So far, we send back a error message
-//		CFrame *error = CFrame::OutAPI[0];
-		/**
-		CFrame *error = CFrame::Get("ERROR");
+		CFrame *error = CFrame::OutAPI[0];
 		char	*messageout = error->Build();
-		Log(messageout);
-		**/
-		LogFrame("ERROR");
-		return NULL;
+		return messageout;
 	}
 }
 
@@ -279,7 +264,7 @@ CFrame::CFrame(const char *_id, const char	*_description, const char *_name, con
 
 		p = q;
 	}
-	if (p &&*p)
+	if (p)
 		this->Segments[i++] = CSegment::Factory(p);
 
 	this->Segments[i] = NULL;
@@ -297,7 +282,7 @@ CFrame::CFrame(const char *_id, const char	*_description, const char *_name, con
 		this->append (CSegment::Factory(p));
 		p = q;
 	}
-	if (p &&*p)
+	if (p)
 		this->append (CSegment::Factory(p));
 #endif
 	free (description);
@@ -366,11 +351,10 @@ bool	CFrame::Execute(const char *message){
 	int i = 0;
 	while (Segments[i] && p) {
 		p = Segments[i]->Execute(p);  
-		if (p && *p)
+		if (p)
 			p++;		// 1 more to skip the separator
 		else
-			break;
-//			return false;
+			return false;
 		i++;
 	}
 	return true;
@@ -378,11 +362,10 @@ bool	CFrame::Execute(const char *message){
 	CSegment *e = this->head;
 	while (e) {
 		p = e->Execute(p) ;			
-		if (p && *p)
+		if (p)
 			p++;		// 1 more to skip the separator
 		else
-			break;
-//			return false;
+			return false;
 		e = e->Next();
 	}
 	return true;
@@ -393,9 +376,7 @@ bool	CFrame::Execute(const char *message){
 
 char	*CFrame::Build(char *dest){
 //	int traza = 0;
-	static char	result[1024];
-	PreAction(this);
-
+	static char	result[MQTT_RESPONSE_BUF_SIZE];
 
 	char *p = (dest?dest:result);
 	*p = 0;
@@ -405,8 +386,9 @@ char	*CFrame::Build(char *dest){
 		char *x = Segments[i]->Build();
 		if (x && strlen(x)) {
 			strcat (p, x);
+			if (p[strlen(p)-1] != ';')
+				strcat (p, ";");				//@ PROVISIONAL
 		}
-		strcat (p, ";");				// put ; always, even in empty segments
 		i++;
 	}
 
@@ -418,7 +400,6 @@ char	*CFrame::Build(char *dest){
 		e = e->Next();
 	}
 #endif
-	PostAction(this);
 	return p;
 }
 
@@ -439,10 +420,6 @@ int	CFrame::Post() {
 }
 
 
-const char			*CFrame::Tag() {
-	return Segments[0]->Txt();
-}
-
 CFrame::~CFrame() {
 	free (this->name);
 #ifdef LINEAL
@@ -454,48 +431,6 @@ CFrame::~CFrame() {
 #endif
 }
 
-char	*CFrame::Iterate(char * (*action)(), unsigned int flags, unsigned char *dest){
-	char *resultado = (char *) malloc(2048);
-	CFrame *frame;
-	unsigned int tamano = 0;
-	int i = 0;
-	*resultado = 0;
-	if (flags & 1) {
-		while ( (frame = InAPI[i++])){
-			char part[128];
-			sprintf (part, "%s:%s;", frame->Tag(), frame->Name());
-			strcat (resultado, part);
-			tamano = strlen(resultado);
-		}
-	}
-	i = 0;
-	if (flags & 2) {
-		while ( (frame = OutAPI[i++])){
-			char part[128];
-			sprintf (part, "%s:%s;", frame->Tag(), frame->Name());
-			strcat (resultado, part);
-			tamano = strlen(resultado);
-		}
-	}
-	SetVariable ("CMDLIST", resultado);
-	free (resultado);
-	return NULL;
-}
-
-int		BuildINs (){
-	char *resultado = CFrame::Iterate(NULL, 1);
-	return 1;
-}
-
-int		BuildOUTSs (){
-	char *resultado = CFrame::Iterate(NULL, 2);
-	return 1;
-}
-
-int		BuildALL (){
-	char *resultado = CFrame::Iterate(NULL, 3);
-	return 1;
-}
 
 
 /////////////////////////////////////////////////////////////////
@@ -594,28 +529,15 @@ CVarSegment::CVarSegment(const char *nombre, bool grant) : CSegment() {
 const char	*CVarSegment::Execute(const char *txt) {
 
 	int traza = 0;
-	char	tmp[256];
+	char	tmp[64];
 	const char *p = txt;
 	const char *q;
 	CVariable	*result;
 
 	if (traza) printf ("Get the variable value for %s after %s \n", this->id->Name(), p);
-	int x = this->id->units();
-	q = p;
-	while (x-- && q) {
-		q = strchr(q, ';');
-		if (q) 
-			q = q + 1;
-		else
-			break;
-	}
-	// q sale sobre el siguiente al ; (o nulo)
-
 #ifdef LINEAL
-
-//	q = strstr(p, ";");
+	q = strstr(p, ";");
 	if (q) {
-		q = q-1;
 		strncpy(tmp, p, q-p);
 		tmp[q-p] = 0 ;
 		if (traza)  printf ("...that is %s\n", tmp);
@@ -629,9 +551,8 @@ const char	*CVarSegment::Execute(const char *txt) {
 	}
 
 #else
-	if (this->Next() && q) {
-		q = q -1;
-//		q = strstr(p, ";");
+	if (this->Next()) {
+		q = strstr(p, ";");
 		strncpy(tmp, p, q-p);
 		tmp[q-p] = 0 ;
 		if (traza)  printf ("...that is %s\n", tmp);
@@ -640,7 +561,7 @@ const char	*CVarSegment::Execute(const char *txt) {
 	}
 	else {
 		if (traza) printf ("All the remainder: var. %s gets %s\n", this->id->Name(), p);
-		result =  this->id->write(p, flags);
+		result =  this->id->write(p);
 		return p + strlen(p);
 	}
 #endif
@@ -692,30 +613,15 @@ void	CFrame::show (void) {
 #endif
 }
 
-
-const char	*CTextSegment::Txt () {
-	return text;
-}
-
 // Show para debug
 void	CTextSegment::show() {
-	printf ("Boilerplate text #%s#\n", this->text);
-}
-
-
-const char	*CVarSegment::Txt () {
-	return id->Id();
+	printf ("Boilerplate text %s\n", this->text);
 }
 
 
 // Show para debug
 void	CVarSegment::show() {
 	printf ("Variable  %s\n", this->id? this->id->Name(): "???");
-}
-
-
-const char	*CListSegment::Txt (){
-	return sub->Name();
 }
 
 
@@ -763,43 +669,18 @@ const char	*CListSegment::Execute(const char *txt) {
 
 
 char	*CListSegment::Build(){
-	static char	aux[2048];
+	static char	aux[MQTT_RESPONSE_BUF_SIZE];
 	char *dest = aux;
 	*dest = 0;
 	unsigned int i = 0;
 	while (i < this->sub->ElementsCount()) {
 		this->sub->SwapIn(this->sub->getElementbyIndex(i));
 
-		char *r = this->inner->Build(dest);
+		/*char *r =*/ this->inner->Build(dest);
 		dest = dest + strlen(dest);
 		i++;
 	}
 	return aux;
 }
 
-// Provisional placement for this
-
-int	SendFrame(const char *tag) {
-	CFrame *cmd = CFrame::Get(tag);
-	if (cmd) {
-		// TO DO: retrieve the topic, and use in Publish
-		char	*mssg = cmd->Build();
-		int rc = Publish(mssg);
-		return rc;
-	}
-	else
-		return -1;
-}
-
-int	LogFrame(const char *tag) {
-	CFrame *cmd = CFrame::Get(tag);
-	if (cmd) {
-		// TO DO: retrieve the topic, and use in Publish
-		char	*mssg = cmd->Build();
-		int rc = Log(mssg);
-		return rc;
-	}
-	else
-		return -1;
-}
 

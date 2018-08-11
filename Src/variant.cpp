@@ -5,7 +5,7 @@
  *      Author: External
  */
 
-#include "utils.h"  // get timestammps
+
 #include "variant.h"
 
 
@@ -42,6 +42,7 @@ char		*CVardec::tostring (){
 
 	int intp = (int) content;
 	int fracp = (int) ((content - intp)* 10 );
+	if (fracp < 0) fracp = -fracp;
 	sprintf(resultado, "%d.%1d", intp, fracp);
 	return resultado;
 }
@@ -79,11 +80,9 @@ CVariant	*CVarstring::write (const char *txt){
 	strncpy (this->content,txt, TFIJO-1);
 //	strcpy (this->content,txt);
 #else
-	if (this->content != txt) {  // prevent try to overwrite same string
-		if (this->content)
-			free (this->content);
-		this->content = strdup(txt);
-	}
+	if (this->content) 
+		free (this->content);
+	this->content = strdup(txt);
 #endif
 	return this;
 }
@@ -114,121 +113,10 @@ char		*CVarstring::tostring (){
 	}
 }
 
-
-CVartime::CVartime(int h, int m, int s, TimeKind k) {
-	hour = h;
-	min = m;
-	sec = s;
-	tkind = k;
-}
-
-
-CVariant	*CVartime::write (const char *txt){
-	const char *prefix[] = {"", "SR-", "SR+", "SS-", "SS+"};
-	if (txt) {
-		int h=0, m=0, s=0;
-		int i;
-		tkind = ABSOLUTE;
-		for (i = PRE_SR; i != LAST; i++){
-			if (!strncmp (txt, prefix[i], strlen(prefix[i]))){
-				tkind = (TimeKind) i;
-				txt = txt + strlen(prefix[i]);
-				break;
-			}
-		}
-		int x = sscanf(txt, "%d:%d:%d", &h, &m,  &s);  // easy to generalize a instance separator...
-		hour = h;
-		min = m;
-		sec = s;
-	}
-	return this;
-}
-
-char		*CVartime::tostring (){
-	const char *prefix[] = {"", "SR-", "SR+", "SS-", "SS+"};
-	sprintf (resultado, "%s%02d:%02d", prefix[tkind], (int) hour, (int) min);
- 	return resultado;
-}
-
-#include "NBinterface.h"
-
-long		CVartime::Timestamp(){
-	int h, m, s;
-	CVartime *sr =	GetTimeVar("SUNRISE");
-	CVartime	*ss =	GetTimeVar("SUNSET");
-	switch (tkind){
-		case ABSOLUTE:
-			h = hour;
-			m = min;
-			s = sec;
-			break;
-		case PRE_SR:
-			h = sr->Hour() - hour;
-			m = sr->Minute() - min;
-			s = sr->Second() - sec;
-			break;
-		case POST_SR:
-			h = sr->Hour() + hour;
-			m = sr->Minute() + min;
-			s = sr->Second() + sec;
-			break;
-		case PRE_SS:
-			h = ss->Hour() - hour;
-			m = ss->Minute() - min;
-			s = ss->Second() - sec;
-			break;
-		case POST_SS:
-			h = ss->Hour() + hour;
-			m = ss->Minute() + min;
-			s = ss->Second() + sec;
-			break;
-	}
-	if (s > 59){
-		m = m + s / 60;
-		s = s % 60;
-	}
-	if (m < 0){
-		h = h - 1;
-		m = m + 60;
-	}
-	if (m > 59){
-		h = h + m / 60;
-		m = m % 60;
-	}
-	if (h < 0){
-		h = h + 24;
-	}
-	if (h > 23){
-		h = h - 24;
-	}
-
-	long result = GetTimeStampAt(h, m, s);
-	return result;
-}
-
-/**
-CVartuple::CVartuple (CVariant *v[], char sep){
-	this->separator  = sep;
-	this->parts[0] = NULL;
-	this->parts[1] = NULL;
-	if (v) {
-		if (v[0]) {
-			this->parts[0] = v[0];
-			if (v[1]){
-				this->parts[1] = v[1];
-			}
-
-		}
-	}
-}
-**/
-
-
-CVartuple::CVartuple (CVariant *v1, CVariant *v2, char sep ){
+CVartuple::CVartuple (char sep, CVariant *v1, CVariant *v2){
 	this->separator  = sep;
 	this->parts[0] = v1;
 	this->parts[1] = v2;
-	resultado = NULL;
 }
 
 CVartuple::~CVartuple() {
@@ -276,35 +164,15 @@ char		*CVartuple::tostring (){
 	else {
 		t2 = NULL;
 	}
-
-	if (resultado) 
-		free (resultado);
-	resultado = (char *) malloc (longitud + 4);
-
-	sprintf (resultado, "%s%c%s", t1?t1:"", this->separator, t2?t2:"" );
-//	if (t1) free (t1);
-//	if (t2) free (t2);
+	char *resultado = (char *) malloc (longitud + 4);
+	sprintf (resultado, "(%s,%s)", t1?t1:"", t2?t2:"" ); 
+	if (t1) free (t1);
+	if (t2) free (t2);
 	return resultado;
 }
 
 
-CVarlist::CVarlist(unsigned int size, CVariant *spec, char sep){
-	this->maxsize = size;
-	this->separator  = sep;
-	this->specimen = spec;
-	this->parts = new CVariant *[size];
-	this->number = 0;
-	for (unsigned int i = 0; i < size; i++) {
-		this->parts[i] = this->specimen->Clone();
-	}
-	resultado = NULL;
-
-
-}
-
-/**
-CVarlist::CVarlist(unsigned int size, CVariant **elems, char sep, bool tupflag){
-	this->maxsize = size;
+CVarlist::CVarlist(char sep, CVariant **elems, bool tupflag){
 	this->separator  = sep;
 	this->flag = tupflag;
 	unsigned int j = 0 ;
@@ -324,88 +192,76 @@ CVarlist::CVarlist(unsigned int size, CVariant **elems, char sep, bool tupflag){
 
 
 }
-**/
+
 
 CVariant	*CVarlist::write (const char *txt){
-	char *txt0= strdup(txt);
-	char *p = txt0;
+	const char *p= txt;
 	const char *s = p;
 	unsigned int i = 0;
-		
-	int u = this->specimen->units();
-
-	for (i=0; s[i]; s[i]==this->separator ? i++ : *s++);
-	// if the count in not multiplo u, add 1 
-	if (i%u)
-		i++;
-
-	this->number = i / u;
-
-		i = 0;
-	char *q = p;
-	while (i < this->maxsize && p && *p ) {
-		int x = u;
-		while (x-- && q) {
-			q = strchr(q, ';');
-			if (q) 
-				q = q + 1;
-			else
-				break;
-		}
-			if (q) {
-			*(q-1) = 0;
-			this->parts[i]->write (p);
-			p = q;
-			}
-		else {
-			// printf ("premature out of separators when %d out of %d\n", i , this->maxsize);
-			this->parts[i]->write (p);
-			p = q;
-		}
+	if (this->parts) {
+		while (i < this->number) {
+			delete this->parts[i];
 			i++;
 		}
-		this->number = i;
+		delete [] this->parts;
+	}	
+	for (i=0; s[i]; s[i]==';' ? i++ : *s++);
+; 
 		
-	free (txt0);
+
+	if (this->flag) {
+		this->number = i / 2;
+		this->parts = new CVariant *[number];
+		char *q;
+		i = 0;
+		while (i < this->number ) {
+			q = strchr(p, this->separator);
+			if (q) {
+				q = strchr(q+1, this->separator);
+				*q = 0;
+			}
+			this->parts[i] = new CVartuple(this->separator);
+			this->parts[i]->write (p);
+			p = q + 1;
+			i++;
+		}
+	}
+	else {
+		this->number = i;
+		this->parts = new CVariant *[number];
+		char *q; 
+		i = 0;
+		while ((q = strchr(p, this->separator)) && i < this->number ) {
+			*q = 0;
+			this->parts[i] = new CVarstring(p);
+			i++;
+			p = q+1;
+		}
+	}
 	return this;
 }
 
-unsigned int	CVarlist::units() { 
-//	return number;
-	return maxsize * this->specimen->units();
-}
 
 char		*CVarlist::tostring (){
-	unsigned int i = 0;
-	if (resultado)
-		free(resultado);
-	resultado = (char *) malloc (1024) ; // OJO: ÑAPA!!!
-	*resultado = 0;
-//	strcpy (resultado, "(");
+	char *resultado = (char *) malloc (1024) ; // OJO: ÑAPA!!!
+	strcpy (resultado, "(");
+	unsigned i = 0;
 	while (i < this->number) {
 		if (i > 0) 
-			strcat (resultado, ";");
+			strcat (resultado, ",");
 		if (this->parts[i]) {
 			char *x = this->parts[i]->tostring();
 			strcat (resultado, x);
-//			free (x);
+			free (x);
 		}
 		i++;
 	}
-//	strcat (resultado, ")");
+	strcat (resultado, ")");
 	return resultado;
 }
 
 
-CVariant		*CVarlist::Item (unsigned int n){
-	if (n < this->number) {
-		return this->parts[n];
-	}
-	else
-		return NULL;
+CVarlist2::CVarlist2(char sep, CVariant **elems): CVarlist(sep,elems, true) {
 }
-
-
-
 
 

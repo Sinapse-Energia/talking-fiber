@@ -10,14 +10,6 @@
 #include "Definitions.h"
 
 
-// HELPER functions
-// Build and send an output frame over publish topic
-extern int		SendFrame(const char *tag);
-
-// Build and send an output frame over log topic
-extern int		LogFrame(const char *tag);
-
-
 //class CFrame;
 class CSegment;
 
@@ -48,8 +40,6 @@ class	CFrame {
 	char				*Build		(char *dest = NULL);
 	char				*Id			() { return this->id;};  // to extinguish when getPre and getPost become methods
 
-	const char			*Name		() { return name; };
-	const char			*Tag		();
 	int					Pre			();
 	int					Post		();
 
@@ -61,7 +51,6 @@ class	CFrame {
 	void				show		();
 
 	static	void		Clear		();
-	static	char		*Iterate	(char * (* pfun )(), unsigned int flags = 3, unsigned char *dest = NULL);
  private:
 	char				*id;
 	char				*name;
@@ -84,7 +73,6 @@ class	CFrame {
 
 
 
-
 class CSegment {
  public:
 	static CSegment		*Factory(char *);
@@ -92,7 +80,6 @@ class CSegment {
 	virtual	char		*Build()	= 0;
 	virtual	bool		Match	(const char *text) {return false;};
 
-	virtual	const char	*Txt	() = 0;
 	virtual	void		show	() = 0;
 	virtual	const char	*Execute(const char *text) = 0;
 	virtual	class CSubspace *Sub()  {return NULL; };
@@ -119,7 +106,6 @@ class CTextSegment : public CSegment {
 	bool				Match		(const char *text);
 	const char			*Execute	(const char *text);
 	char				*Build		();
-	const char			*Txt		();
  private:
 	char				*text;
 };
@@ -128,8 +114,6 @@ class CVarSegment : public CSegment {
  public:
 						CVarSegment (const char *n, bool p = false);
 //						~CVarSegment (void);
-
-	const char			*Txt		();
 	void				show		();
 //	bool				Match		(const char *text);
 	const char			*Execute	(const char *text);
@@ -145,7 +129,6 @@ class CListSegment : public CSegment {
  public:
 	CListSegment (const char *);
 //						~CVarSegment (void);
-	const char			*Txt		();
 	void				show		();
 //	bool				Match		(const char *text);
 	const char			*Execute	(const char *text);
@@ -174,6 +157,7 @@ CFrame	**ReadFrames2(const char **lineas);
 //	The pointers have to have the same signature
 //		(no parameters and integer return code)
 ///////////////////////////////////////////////////////////
+typedef	 int  (* Action) ();
 
 struct	st_fractions {
 	const char		*id;
@@ -186,9 +170,6 @@ struct	st_fractions {
 
 
 extern	struct st_fractions actions[];
-
-
-
 
 
 #endif /* FRAMES_H_ */

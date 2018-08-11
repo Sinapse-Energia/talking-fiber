@@ -2,13 +2,11 @@
   ******************************************************************************
   * @file    stm32f215xx.h
   * @author  MCD Application Team
-  * @version V2.2.0
-  * @date    17-March-2017
   * @brief   CMSIS STM32F215xx Device Peripheral Access Layer Header File. 
   *          This file contains :  
   *           - Data structures and the address mapping for all peripherals
   *           - Peripherals registers declarations and bits definition
-  *           - Macros to access peripheralï¿½s registers hardware
+  *           - Macros to access peripheral’s registers hardware
   *
   ******************************************************************************
   * @attention
@@ -84,6 +82,7 @@ typedef enum
 {
 /******  Cortex-M3 Processor Exceptions Numbers ****************************************************************/
   NonMaskableInt_IRQn         = -14,    /*!< 2 Non Maskable Interrupt                                          */
+  HardFault_IRQn              = -13,    /*!< 3 Hard Fault Interrupt                                            */
   MemoryManagement_IRQn       = -12,    /*!< 4 Cortex-M3 Memory Management Interrupt                           */
   BusFault_IRQn               = -11,    /*!< 5 Cortex-M3 Bus Fault Interrupt                                   */
   UsageFault_IRQn             = -10,    /*!< 6 Cortex-M3 Usage Fault Interrupt                                 */
@@ -879,9 +878,7 @@ USB_OTG_HostChannelTypeDef;
 /** 
   * @brief Peripheral_memory_map
   */
-//#define FLASH_BASE            0x08000000U /*!< FLASH(up to 1 MB) base address in the alias region                         */
-#define FLASH_BASE            0x0800C000U /*!< FLASH(up to 1 MB) base address in the alias region                         */
-
+#define FLASH_BASE            0x08000000U /*!< FLASH(up to 1 MB) base address in the alias region                         */
 #define SRAM1_BASE            0x20000000U /*!< SRAM1(112 KB) base address in the alias region                             */
 #define SRAM2_BASE            0x2001C000U /*!< SRAM2(16 KB) base address in the alias region                              */
 #define PERIPH_BASE           0x40000000U /*!< Peripheral base address in the alias region                                */
@@ -988,7 +985,6 @@ USB_OTG_HostChannelTypeDef;
 /*!< AHB2 peripherals */
 #define CRYP_BASE             (AHB2PERIPH_BASE + 0x60000U)
 #define HASH_BASE             (AHB2PERIPH_BASE + 0x60400U)
-#define HASH_DIGEST_BASE      (AHB2PERIPH_BASE + 0x60710U)
 #define RNG_BASE              (AHB2PERIPH_BASE + 0x60800U)
 
 /*!< FSMC Bankx registers base address */
@@ -1103,7 +1099,6 @@ USB_OTG_HostChannelTypeDef;
 #define DMA2_Stream7        ((DMA_Stream_TypeDef *) DMA2_Stream7_BASE)
 #define CRYP                ((CRYP_TypeDef *) CRYP_BASE)
 #define HASH                ((HASH_TypeDef *) HASH_BASE)
-#define HASH_DIGEST         ((HASH_DIGEST_TypeDef *) HASH_DIGEST_BASE)
 #define RNG                 ((RNG_TypeDef *) RNG_BASE)
 #define FSMC_Bank1          ((FSMC_Bank1_TypeDef *) FSMC_Bank1_R_BASE)
 #define FSMC_Bank1E         ((FSMC_Bank1E_TypeDef *) FSMC_Bank1E_R_BASE)

@@ -17,7 +17,6 @@
 
 #undef		TFIJO
 
-enum	Varkind { INT, DEC, STRING, TIME, TUPLE, LIST };
 
 /***************************************************
 	Base class (abstract)
@@ -26,11 +25,8 @@ enum	Varkind { INT, DEC, STRING, TIME, TUPLE, LIST };
 class CVariant	{
 	public :
 		virtual CVariant	*write (const char *txt) = 0;
-		virtual				~CVariant	()	{};
 		virtual char		*tostring () = 0;
-		virtual CVariant	*Clone		()	= 0;
-		virtual unsigned int units		() { return 1; }
-		virtual	Varkind		Kind		()  = 0;
+		virtual				~CVariant()		{};
 	protected :
 #ifdef	TFIJO
 		char				resultado[TFIJO];
@@ -49,12 +45,9 @@ class CVariant	{
 ****************************************************/
 class CVarint : public CVariant {
 	public :
-					CVarint		(int value = 0);
-		CVariant	*Clone		()	{ return new CVarint(content);};
+					CVarint(int value = 0);
 		CVariant	*write (const char *txt);
 		char		*tostring ();
-		Varkind		Kind	()	{return INT;}
-		int			Value		() { return content;}
 	private :
 		char		resultado[16];
 		int			content;
@@ -66,12 +59,9 @@ class CVarint : public CVariant {
 ****************************************************/
 class CVardec : public CVariant {
 	public :
-					CVardec		(double value = 0.0);
-		CVariant	*Clone		()	{ return new CVardec( content);};
+					CVardec(double value = 0.0);
 		CVariant	*write (const char *txt);
 		char		*tostring ();
-		Varkind		Kind	()	{return DEC;}
-		double		Value		() { return content;}
 	private :
 		double		content;
 		char		resultado[16];
@@ -79,17 +69,14 @@ class CVardec : public CVariant {
 
 
 /***************************************************
-	class CVarstring (text content)
+	class CVarstring (trext content)
 ****************************************************/
 class CVarstring : public CVariant {
 	public :
-						CVarstring	(const char *value = NULL);
-						~CVarstring	();
-		CVariant	*Clone		()	{ return new CVarstring( content);};
+					CVarstring(const char *value = NULL);
+					~CVarstring();
 		CVariant	*write (const char *txt);
 		char		*tostring ();
-		Varkind			Kind	()	{return STRING;}
-		const  char		*Value		()  { return content;}
 	private :
 #ifdef TFIJO
 		char		content[TFIJO];
@@ -99,52 +86,17 @@ class CVarstring : public CVariant {
 };
 
 
-
-/***************************************************
-	class CVartime (time content)
-****************************************************/
-class CVartime : public CVariant {
-	enum TimeKind  {ABSOLUTE = 0, PRE_SR, POST_SR, PRE_SS, POST_SS, LAST};
-	public :
-						CVartime	(int h = 0, int m = 0, int s = 0, TimeKind k = ABSOLUTE);
-//						~CVartime	();
-		CVariant	*Clone		()	{ return new CVartime( hour, min, sec);};
-		CVariant	*write (const char *txt);
-		char		*tostring ();
-		Varkind			Kind		() {return TIME;}
-		unsigned int	Hour		() { return hour;};
-		unsigned int	Minute		() { return min;};
-		unsigned int	Second		() { return sec;};
-		long			Timestamp	();
-
-	private :
-	private :
-		char			resultado[16];
-		unsigned char 	hour;
-		unsigned char 	min;
-		unsigned char 	sec;
-		TimeKind		tkind;
-
-
-};
-
-
 /***************************************************
 	class CVartuple (tuple of Variants)
 ****************************************************/
 class CVartuple : public CVariant {
 	public :
-						CVartuple	(CVariant *v1 = NULL, CVariant *v2 = NULL, char sep = ';' );
-						~CVartuple	();
-		CVariant		*Clone		()	{ return new CVartuple( parts[0]->Clone(), parts[1]->Clone(), separator);};
+						CVartuple(char sep, CVariant *v1 = NULL, CVariant *v2 = NULL );
+						~CVartuple();
 		CVariant		*write (const char *txt);
 		char			*tostring ();
-		Varkind			Kind		() {return TUPLE;}
-		CVariant		*Item		(unsigned int n) { return ((n<2)? parts[n]:NULL); };
-		unsigned int	units		() { return 2; } ;
 	private :
 		char			separator;
-		char			*resultado;
 		CVariant		*parts[2];
 };
 
@@ -154,26 +106,28 @@ class CVartuple : public CVariant {
 ****************************************************/
 class CVarlist : public CVariant {
 	public :
-//						CVarlist(unsigned int size, CVariant **velems = NULL, char sep = ';', bool tupflag = false );
-						CVarlist	(unsigned int size, CVariant *specimen, char sep = ';' );
-		CVariant		*Clone		()	{ return new CVarlist( maxsize, specimen, separator);};  // FUDGE
-		CVariant		*write		( const char *txt );
-		char			*tostring	();
-		Varkind			Kind		() {return LIST;}
-		unsigned int	size		() { return number; };
-		CVariant		*Item		(unsigned int n);
-		unsigned int	units		(); // { return number; }
+						CVarlist(char sep, CVariant **velems = NULL, bool tupflag = false );
+		CVariant		*write (const char *txt);
+		char			*tostring ();
 	private :
 		char			separator;
-		char			*resultado;
-		CVariant		*specimen;
-		unsigned int	maxsize;
+		bool			flag;
 		unsigned int	number;
 		CVariant		**parts;
 };
 
 
-	
+/***************************************************
+	CLASE VARIANT CVarlist2 (id for duples)  // ad-hoc
+****************************************************/
+class CVarlist2 : public CVarlist {
+	public :
+						CVarlist2(char sep, CVariant **velems = NULL);
+	//	CVariant		*write (const char *txt);
+};
+
+
+
 
 
 #endif /* VARIANT_H_ */

@@ -7,380 +7,253 @@
 
 
 #include 	<stdio.h>
-#include 	<string.h>
 #include 	<stdarg.h>
-#include 	<stdlib.h>
+#include 	<string.h>
+#include 	<stdbool.h>
+#include 	<math.h>
 #include	"utils.h"
-#include	"NBinterface.h"		// any of them is implemented here
-#include 	"southbound_ec.h"	// NVM access functions
+#include	"Definitions.h"
+#include	"NBinterface.h"
 
-////////////////////////  LED COLORING ////////////////////////////////
-static int color;
+#ifdef TIME_WITH_RTC
 
-int	getcolor(){
-	return color;
-}
-void	_color(int col){
-	switch (col) {
-		case 0: (blueOFF, redOFF, greenOFF); return;
-		case 1: (blueON,  redOFF, greenOFF); return;
-		case 2: (blueOFF, redON,  greenOFF); return;
-		case 3: (blueOFF, redOFF, greenON); return;
-		case 4: (blueON,  redOFF, greenON); return;
-		case 5: (blueON,  redON,  greenOFF); return;
-		case 6: (blueOFF, redON,  greenON); return;
-		case 7: (blueON,  redON,  greenON); return;
-	}
-}
+#include "rtc.h"
 
-void	Color(int col){
-	color = col;
-	_color(color);
-}
-/**
-void	ROTATE(){
-	color = (color + 1) % 8;
-	Color(color);
-}
-**/
+#endif
 
-void	Blink() {
-	static int	blink = 0;
-	blink = ! blink;
-	if (blink){
-		_color(color);
-	}
-	else {
-		_color (0);
-	}
-}
-
-////////////////////  MISSED INET UNIX FUNCTIONS  //////////////////////////////////////
-
-// ntohl convert from network to host endians .
-// ONLY used from NTP call
-uint32_t ntohl(uint32_t const net) {
-    uint8_t data[4] = {};
-    memcpy(&data, &net, sizeof(data));
-
-    return ((uint32_t) data[3] << 0)
-         | ((uint32_t) data[2] << 8)
-         | ((uint32_t) data[1] << 16)
-         | ((uint32_t) data[0] << 24);
-}
-
-
-////////////////////  SELF MANTAINED DATE & TIME  //////////////////////////////////////
-
-// struct for itemized date & time
 struct tm	ECdatetime;
 
-// The Unix timestamp (seconds from epoch)
-time_t		ECtimestamp;
+long		ECtimestamp;
 
-int SetTimeStamp(uint32_t ts){
-	ECtimestamp = ts;
-	ECdatetime  = *localtime(&ECtimestamp);
-	return 1;
-}
+int SetDateTime(const char *NTP) {
 
-int SetDateTimeNTP(const char *reply){
-// #\r\n+QNTP: 0,"2018/01/29,20:56:09+04"\r\n#
-	char	c;
-	int		utcoffset = 0;
-	struct tm	Temp_tm;
-	time_t		TempTS;
-	int n = sscanf (reply, "\r\nOK\r\n\r\n+QNTP: %c, \"%d/%d/%d,%d:%d:%d+%d\r\n\"", &c, &Temp_tm.tm_year, &Temp_tm.tm_mon, &Temp_tm.tm_mday, &Temp_tm.tm_hour, &Temp_tm.tm_min, &Temp_tm.tm_sec, &utcoffset);
-	if ( n ==8 ){
-		char utctxt[8];
-		utcoffset = utcoffset/4;
+	sscanf (NTP+2, "%d/%d/%d,%d:%d:%d", &ECdatetime.tm_year, &ECdatetime.tm_mon,
+			&ECdatetime.tm_mday, &ECdatetime.tm_hour, &ECdatetime.tm_min, &ECdatetime.tm_sec);
 
-		Temp_tm.tm_hour += utcoffset; // ??
+#ifdef TIME_WITH_RTC
 
-		itoa(utcoffset, utctxt, 10);
-		SetVariable ("TZONE", utctxt);
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
 
-		// Adjust to real struct tm rules
-		Temp_tm.tm_mon -= 1;
-		Temp_tm.tm_year -= 1900;
+	dt.Year = ECdatetime.tm_year;
+	dt.Month = ECdatetime.tm_mon;
+	dt.Date = ECdatetime.tm_mday;
+	dt.WeekDay = RTC_WEEKDAY_MONDAY;
 
+	tt.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+	tt.Hours = ECdatetime.tm_hour;
+	tt.Minutes = ECdatetime.tm_min;
+	tt.Seconds = ECdatetime.tm_sec;
+	tt.StoreOperation = RTC_STOREOPERATION_RESET;
+	tt.TimeFormat = RTC_FORMAT_BIN;
 
+	HAL_RTC_SetDate(&hrtc, &dt, RTC_FORMAT_BIN);
+	HAL_RTC_SetTime(&hrtc, &tt, RTC_FORMAT_BIN);
 
-		TempTS = mktime(&Temp_tm);
-		if (TempTS >= ECtimestamp) {
-			ECdatetime = Temp_tm;
-			ECtimestamp = TempTS;
-		}
-		else {
-			// Return to the past... Let it be as is
-		}
-		return 1;
+	ECdatetime.tm_year += 2000;
+	ECtimestamp = mktime(&ECdatetime);
+
+#else
+
+	ECdatetime.tm_year += 2000;
+	ECdatetime.tm_hour += UTC_OFFSET;
+
+	if (ECdatetime.tm_sec > 5) {
+		ECdatetime.tm_sec -= 5;
 	}
-	else
-		return 0;
-
-}
-
-// The function now can deal with the reply of CCLK command (NTP server), and QLTS command (Network time)
-int SetDateTime(const char *reply){
-	int			utcoffset = 0;
-	char		Ttype[16];
-	struct tm	Temp_tm = {0};
-	time_t		TempTS = 0;
-	int n = sscanf (reply+2, "+%s \"%d/%d/%d,%d:%d:%d+%d", Ttype, &Temp_tm.tm_year, &Temp_tm.tm_mon, &Temp_tm.tm_mday, &Temp_tm.tm_hour, &Temp_tm.tm_min, &Temp_tm.tm_sec, &utcoffset);
-	if ( n ==8 ){
-		if (!strcmp (Ttype, "CCLK:")) {
-			Temp_tm.tm_year += 100;
-			utcoffset = 1;
-			SetVariable ("TZONE", "1");
-		}
-		if (!strcmp (Ttype, "QLTS:")){
-			char utctxt[8];
-			utcoffset = utcoffset/4;
-			itoa(utcoffset, utctxt, 10);
-			SetVariable ("TZONE", utctxt);
-			Temp_tm.tm_year -= 1900;
-		}
-		// Adjust to real struct tm rules
-		Temp_tm.tm_mon -= 1;
-		Temp_tm.tm_hour += utcoffset;
-
-		if (Temp_tm.tm_sec > 5) {
-			Temp_tm.tm_sec -= 5;
-		}
-		else {
-			Temp_tm.tm_sec = 0;
-		}
-
-		TempTS = mktime(&Temp_tm);
-		if (TempTS >= ECtimestamp) {
-			ECdatetime = Temp_tm;
-			ECtimestamp = TempTS;
-		}
-		else {
-			// Return to the past... Let it be as is
-		}
-		return 1;
+	else {
+		ECdatetime.tm_sec = 0;
 	}
-	else
-		return 0;
+//	sscanf (NTP+2, "%d/%d/%d", &ECdatetime.tm_year, &ECdatetime.tm_mon, &ECdatetime.tm_mday);
+	ECtimestamp = ((ECdatetime.tm_hour * 60 + ECdatetime.tm_min) * 60 ) + ECdatetime.tm_sec;
+
+#endif
+
+	return ECtimestamp;
 };
 
-const struct tm 	*GetTimeStructure(void){
-	return &ECdatetime;
+char* GetDateTime(void) {
+
+	static char buf[24];
+
+#ifdef TIME_WITH_RTC
+
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
+
+	HAL_RTC_GetTime(&hrtc, &tt, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &dt, RTC_FORMAT_BIN);
+
+	ECdatetime.tm_year = dt.Year + 2000;
+	ECdatetime.tm_mon = dt.Month;
+	ECdatetime.tm_mday = dt.Date;
+
+	ECdatetime.tm_hour = tt.Hours;
+	ECdatetime.tm_min = tt.Minutes;
+	ECdatetime.tm_sec = tt.Seconds;
+
+#endif
+
+	sprintf(buf, "%04d/%02d/%02d,%02d:%02d:%02d",
+			ECdatetime.tm_year, ECdatetime.tm_mon, ECdatetime.tm_mday,
+			ECdatetime.tm_hour, ECdatetime.tm_min, ECdatetime.tm_sec);
+	return &buf[0];
 }
 
-time_t GetTimeStamp(){
+long GetTimeStamp() {
+
+#ifdef TIME_WITH_RTC
+
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
+
+	HAL_RTC_GetTime(&hrtc, &tt, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &dt, RTC_FORMAT_BIN);
+
+	ECdatetime.tm_year = dt.Year + (2000 - 1900);
+	ECdatetime.tm_mon = dt.Month - 1;
+	ECdatetime.tm_mday = dt.Date;
+
+	ECdatetime.tm_hour = tt.Hours;
+	ECdatetime.tm_min = tt.Minutes;
+	ECdatetime.tm_sec = tt.Seconds;
+
+	ECtimestamp = mktime(&ECdatetime);
+
+#endif
+
 	return ECtimestamp;
 }
 
-time_t GetTimeStampAt(unsigned int h, unsigned int m, unsigned int s){
-	// make a copy of the ECsatetime
-	struct tm tx =  ECdatetime;
-	tx.tm_hour = h;
-	tx.tm_min = m;
-	tx.tm_sec = s;
-	time_t result = mktime(&tx);
-	return result;
-}
+void AddSeconds(int n) {
 
+#ifndef TIME_WITH_RTC
 
-void AddSeconds(int n){
-	UpdateTimeStamp(n);
-}
-
-void UpdateTimeStamp(int n){
-//	struct tm work;
 	ECtimestamp += n;
-	ECdatetime  = *gmtime(&ECtimestamp);
-}
+	ECdatetime.tm_sec += n;
+	if (ECdatetime.tm_sec > 59) {
+		ECdatetime.tm_min += ECdatetime.tm_sec / 60;
+		ECdatetime.tm_sec = ECdatetime.tm_sec % 60;
+		if (ECdatetime.tm_min > 59) {
+			ECdatetime.tm_hour += ECdatetime.tm_min / 60;
+			ECdatetime.tm_min = ECdatetime.tm_min % 60;
+			if (ECdatetime.tm_hour > 23) {
+				ECdatetime.tm_mday += ECdatetime.tm_hour / 24;
+				ECdatetime.tm_hour = ECdatetime.tm_hour % 24;
+			}
+		}
+	}
 
-//  Returns the tm year
-unsigned int  GetYear(void){
-	return ECdatetime.tm_year + 1900;
-}
-//  Returns the tm month
-unsigned int  GetMonth(void){
-	return ECdatetime.tm_mon + 1;
-}
-//  Returns the tm month
-unsigned int  GetDay(void){
-	return ECdatetime.tm_mday;
-}
+#endif
 
-
-char	*UpdateSR(const char *x) {
-	EvalSunTimes();
-	return GetVariable("SUNRISE");
 }
-
-char	*UpdateSS(const char *x) {
-	EvalSunTimes();
-	return GetVariable("SUNSET");
-}
-
-// pre-action for "NOW" variable
-char	*UpdateNow(const char *x) {
-	static	char	TS[32];
-	sprintf (TS, "%02d:%02d:%02d", ECdatetime.tm_hour, ECdatetime.tm_min, ECdatetime.tm_sec);
-	return TS;
-	;
-}
-
-// pre-action for "DATE_TIME" variable
-char	*UpdateTS(const char *x) {
-	return strDateTime()	;
-}
-
-
-// pre-action for "UNIXTS" variable
-char	*UpdateUTS(const char *x) {
-	static char strTS[20];
-	itoa (GetTimeStamp(), strTS, 10);
-	return strTS;
-}
-
 
 char	*strDateTime() {
+
 	static	char	DT[64];
+
+#ifdef TIME_WITH_RTC
+
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
+
+	HAL_RTC_GetTime(&hrtc, &tt, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &dt, RTC_FORMAT_BIN);
+
+	ECdatetime.tm_year = dt.Year + 2000;
+	ECdatetime.tm_mon = dt.Month;
+	ECdatetime.tm_mday = dt.Date;
+
+	ECdatetime.tm_hour = tt.Hours;
+	ECdatetime.tm_min = tt.Minutes;
+	ECdatetime.tm_sec = tt.Seconds;
+
+#endif
+
 	sprintf (DT, "%d-%d-%d %02d:%02d:%02d",
-					ECdatetime.tm_mday, ECdatetime.tm_mon+1, ECdatetime.tm_year+1900,
+					ECdatetime.tm_mday, ECdatetime.tm_mon, ECdatetime.tm_year,
 					ECdatetime.tm_hour, ECdatetime.tm_min, ECdatetime.tm_sec);
 	return DT;
 }
 
+char	*getHour(void) {
 
-////////////////////  MPU Real Time Clock DATE & TIME  //////////////////////////////////////
+	static char hourBuf[8];
 
-extern RTC_TimeTypeDef structTimeRTC;
-extern RTC_DateTypeDef structDateRTC;
+#ifdef TIME_WITH_RTC
 
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
 
-int	UpdateRTC(void *ph){
-	RTC_HandleTypeDef *phrtc = (RTC_HandleTypeDef  *)ph;
+	HAL_RTC_GetTime(&hrtc, &tt, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &dt, RTC_FORMAT_BIN);
 
-	structTimeRTC.Hours = ECdatetime.tm_hour;
-	structTimeRTC.Minutes = ECdatetime.tm_min;
-	structTimeRTC.Seconds = ECdatetime.tm_sec;
+	ECdatetime.tm_year = dt.Year + 2000;
+	ECdatetime.tm_mon = dt.Month;
+	ECdatetime.tm_mday = dt.Date;
 
-	structDateRTC.Date = ECdatetime.tm_mday;
-	structDateRTC.Month = ECdatetime.tm_mon;
-	structDateRTC.Year = ECdatetime.tm_year;
+	ECdatetime.tm_hour = tt.Hours;
+	ECdatetime.tm_min = tt.Minutes;
+	ECdatetime.tm_sec = tt.Seconds;
 
-	MIC_Set_RTC (phrtc, &structTimeRTC, &structDateRTC, RTC_FORMAT_BIN);
-
-	return 1;
-}
-
-int GetRTC(void *ph){
-	RTC_HandleTypeDef *phrtc = (RTC_HandleTypeDef  *)ph;
-
-	MIC_Get_RTC (phrtc, &structTimeRTC, &structDateRTC, RTC_FORMAT_BIN);
-
-	ECdatetime.tm_hour = structTimeRTC.Hours;
-	ECdatetime.tm_min = structTimeRTC.Minutes;
-	ECdatetime.tm_sec = structTimeRTC.Seconds;
-
-	ECdatetime.tm_mday = structDateRTC.Date;
-	ECdatetime.tm_mon = structDateRTC.Month;
-	ECdatetime.tm_year =  structDateRTC.Year;
-
-	ECtimestamp = mktime(&ECdatetime);
-	return 1;
-}
-
-
-#ifdef DEBUG
-char	*Set_TimeOffset(const char *val) {
-	int valor = atoi (val);
-	UpdateTimeStamp(valor*60*60);
-	return val;
-}
-char	*Set_TimePing(const char *val) {
-	int value = atoi (val);
-	if (value > 0)
-		timeping = value;
-	return val;
-}
-char	*Set_TimePoll(const char *val) {
-	int value = atoi (val);
-	if (value > 0)
-		timepolling = value;
-	return val;
-}
 #endif
 
-
-
-// Helper funcyion to analyze if a host is a DNS or a IP address
-// It returns 0 if the host is an IP address (999.999.999.999) and 1 otherwise
-// ONLY used so far in M95
-int isdns(unsigned char * host){
-	int n1, n2, n3, n4;
-	int n = sscanf((const char *)host, "%d.%d.%d.%d", &n1, &n2, &n3, &n4);
-	if (n == 4)
-		return 0;
-	else
-		return 1;
+	sprintf(hourBuf, "%d", ECdatetime.tm_hour);
+	return hourBuf;
 }
 
-// Callback to parse the reply to AT+GMM Command and get the transceiver model
-// ONLY used in MODEMFACTORY
-int	 SetGPRSDevice(const char *txt){
-	if (!strcmp(txt, "\r\nBG96\r\n\r\nOK\r\n"))
-		SetVariable ("GPRSDEVICE", "BG96");
-	else if (!strcmp(txt, "\r\nQuectel_M95\r\n\r\nOK\r\n"))
-		SetVariable ("GPRSDEVICE", "M95");
-	else
-		SetVariable ("GPRSDEVICE", "M95");
-	return 1;
+char	*getMinute(void) {
+
+	static char minuteBuf[8];
+
+#ifdef TIME_WITH_RTC
+
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
+
+	HAL_RTC_GetTime(&hrtc, &tt, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &dt, RTC_FORMAT_BIN);
+
+	ECdatetime.tm_year = dt.Year + 2000;
+	ECdatetime.tm_mon = dt.Month;
+	ECdatetime.tm_mday = dt.Date;
+
+	ECdatetime.tm_hour = tt.Hours;
+	ECdatetime.tm_min = tt.Minutes;
+	ECdatetime.tm_sec = tt.Seconds;
+
+#endif
+
+	sprintf(minuteBuf, "%d", ECdatetime.tm_min);
+	return minuteBuf;
 }
 
-// Helper function to parse the BG96 GPS data reply
-// ONLY used from QueryPosition
-int		GetPositioning (const char *cpgga){
-//	char *cpgga ="+QGPSLOC: 114035.0,4032.2101N,00355.7221W,0.0,656.0,2,13.37,0.0,0.0,280118,00";
-	static char	strUTS[20];
-	char latitude[10], longitude[10];
-	float f0;
+void getDate(int* outDay, int* outMonth, int* outYear) {
 
-//	int x = sscanf (cpgga, "\r\n+QGPSLOC: %f,%10s,%11s,", &f0, latitude, longitude);
-// 	Provisional shortcut to avoid problems with the first match
-// Mode 2 (decimal degrees..), for NW only so far
-	int x = sscanf (cpgga+21, "%8s,%8s,", latitude, longitude);
-//	int x = sscanf(cpgga, "+QGPSLOC: %[^,],%[^,],%[^,]", strUTS, latitude, longitude );
-	if (x ==2) {
-		// Update Coordenates
-		SetVariable ("LATITUDE", latitude);
-		SetVariable ("LONGITUDE", longitude);
-		// Update Flag
-		SetVariable ("GPS", "1");
-		// mark timestamp
-		itoa (GetTimeStamp(), strUTS, 10);
-		SetVariable("GPSTS", strUTS);
-		// Set proper Color
-		Color(COL_CONNECTEDGPS);
-		return 1;
-	}
-	else {
-//		SetVariable ("LATITUDE", "-1");
-//		SetVariable ("LONGITUDE", "-1");
-//		SetVariable("GPSTS", strUTS);
-//		itoa (GetTimeStamp(), strUTS, 10);
-//		Color(COL_CONNECTEDGPS);
+#ifdef TIME_WITH_RTC
 
-		// Update Flag
-		SetVariable ("GPS", "0");
-		// Set proper Color
-		Color(COL_CONNECTED);
-		// has to return 1 anyway because otherwise will disable to send de reply message
-		return 1;  //
-	}
+	RTC_DateTypeDef dt;
+	RTC_TimeTypeDef tt;
+
+	HAL_RTC_GetTime(&hrtc, &tt, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &dt, RTC_FORMAT_BIN);
+
+	ECdatetime.tm_year = dt.Year + 2000;
+	ECdatetime.tm_mon = dt.Month;
+	ECdatetime.tm_mday = dt.Date;
+
+	ECdatetime.tm_hour = tt.Hours;
+	ECdatetime.tm_min = tt.Minutes;
+	ECdatetime.tm_sec = tt.Seconds;
+
+#endif
+
+	if (outDay != NULL) *outDay = ECdatetime.tm_mday;
+	if (outMonth != NULL) *outMonth = ECdatetime.tm_mon;
+	if (outYear != NULL) *outYear = ECdatetime.tm_year;
 }
 
-
-#if defined(BUILD_M95)
-// To handle the reply for M95...
+// Pending : to validate the IP format is correct
 int	 SetLocalIP(const char *txt){
 	char	myIP[20];
 	strcpy (myIP, txt+2);
@@ -391,7 +264,7 @@ int	 SetLocalIP(const char *txt){
 	return 1;
 }
 
-// To handle the reply for M95...
+// Pending : to validate the SIM format is correct
 int	SetIdSIM(const char *txt){
 	char	SIM[40];
 	strcpy (SIM, txt+2);
@@ -402,40 +275,6 @@ int	SetIdSIM(const char *txt){
 	return 1;
 }
 
-#endif
-
-
-#if defined(BUILD_BG96)
-// To handle the reply for BG96...
-int	 SetLocalIP2(const char *reply){
-	char	myIP[20];
-	int x = sscanf (reply+2, "+QIACT: 1,1,1,\"%s", myIP );
-	if (x == 1) {
-		char *p = strchr(myIP, '"');
-		if (p)
-			*p = 0;
-		SetVariable ("LOCALIP", myIP);
-	}
-	return 1;
-}
-
-// To handle the reply for BG96...
-int	SetIdSIM2(const char *txt){
-	char	SIM[40];
-	char *p;
-	strcpy (SIM, txt+10);
-	p = strchr(SIM, '\r');
-	if (p)
-		*p = 0;
-	SetVariable ("IDSIM", SIM);
-	return 1;
-}
-
-#endif
-
-
-#if defined(BUILD_M95) || defined (BUILD_BG96)
-
 int	SetIMEI(const char *txt){
 	char	IMEI[32];  // supossed to have 16 chars
 	strncpy (IMEI, txt+2, 20);  // provisional.... sometimes comes longer to null terminator
@@ -443,10 +282,22 @@ int	SetIMEI(const char *txt){
 	if (p)
 		*p = 0;
 	SetVariable ("IMEI", IMEI);
-	SetVariable ("ID", IMEI);
+
+	// If ID was previously set with 209; command - dont use IMEI/MAC as ID
+	char* id209 = GetVariable("NEWID");
+	if (strcmp("-1", id209) != 0) return 1;
+
+	// Set ID to last 6 IMEI digits
+	size_t lenIMEI = strlen(IMEI);
+	if (lenIMEI >= 6)
+	{
+		char* last6IMEIdigits = &IMEI[lenIMEI-6];
+		SetVariable("ID", last6IMEIdigits);
+	}
 
 	return 1;
 }
+
 
 int		ValidateReg(const char *reply){
 	int	n;
@@ -467,49 +318,14 @@ int		ValidateReg(const char *reply){
 
 	return 1;
 }
-#endif
 
 
 
 int		SetGeneric(const char *txt){
-	const char *tmp = txt;
+	//const char *tmp = txt;
 
 	return 1;
 }
-int		SetState(const char *txt){
-	const char *tmp = txt;
-
-	return 1;
-}
-
-#if defined(BUILD_RM08)
-int		SetMAC (const char *txt){
-	char	mac[40];
-	strcpy (mac, txt+8);  // provisional.... sometimes comes longer to null terminator
-	char *p = strchr(mac, ',');
-	if (p) {
-		*p = 0;
-		SetVariable ("MAC", mac);
-		SetVariable ("ID", mac);
-	}
-	return 1;
-}
-
-/** not used anymore
-int		ValidateStat(const char *reply){
-	int n, stat;
-	int x = sscanf (reply, "at+RNStat%d=%d\r\n", &n, &stat );
-	if (x == 2) {
-		if ( stat == 4 )
-				return 1;
-		else
-			return -1; //it lasts.... retry again
-	}
-	else
-		return 0;
-}
-**/
-#endif
 
 // Helper function to accumulate trace until it can be shown
 // Small buffer allocation until verify how much memory is available
@@ -522,141 +338,387 @@ int		pretrace(char *texto,...) {
 	return 1;
 }
 
+//
+//
+// 	This is a PROVISIONAL function intended to verify the message manipulation, without having to depend on message reception
+//	Uses a arbitrary sequence of commands in a circular list....
+//	Each tiem de function is called, returns the next message form the list
 
-
-
-
-#define STORESIZE 512
-char	store[STORESIZE];
-
-
-int	SaveALL(){
-	const char	*listofvars[] = {
-// CONNECTION
-			"IP","PORT", "USER", "PSWD", "SEC", "LIP", "LPORT","LUSER", "LPSWD","LSEC",
-// TRANSPORT
-#if defined (GPRS_TRANSPORT)
-			"APN", "LAPN",
-#endif
-// LIGHTING
-			"PWM",
-			"MPERIOD", "MPTIMES", "MPBEGIN", "MPEND",
-// GEO
-			"LONGITUDE", "LATITUDE",
-// BL
-			"ID", "UPDFW", "UPDFW_COUNT", "FWNAME", "FWVERSION", "UPDFW_PROTO", "UPDFW_HOST", "UPDFW_PORT",	 "UPDFW_NAME", "UPDFW_ROUTE", "UPDFW_USER", "UPDFW_PSWD",
-// MISC
-			"SYNCHTS", "BOARD",
-			NULL
-	};
-	int i = 0;
-	store[0] = 0;
-	while (listofvars[i]) {
-		char item[128];
-		const char *name = listofvars[i];
-		char *value = GetVariable(name);
-		if (value){
-			sprintf (item, "%s=%s;",  name, value );
-			if (strlen(store) + strlen(item) < STORESIZE){
-				strcat(store, item);
-				i++;
-			}
-			else {
-				break;
-			}
-		}
-		else
-			i++;
-	}
-	MIC_Flash_Memory_Write((const uint8_t *) store, (uint32_t)strlen(store)+ 1);
-	return 1;
+char	*GetLocalMessage(int h, char *buffer, int maxsize){
+	static  	char 	*messages[] = {
+	  			"1;",
+				"3;20;",
+				"1;",
+				"3;60;",
+				"1;",
+				"3;90;",
+				"1;",
+				"3;0;"
+	  	};
+	static int i = 0;
+	char	*result = messages[i];
+	i = (i+1)%(sizeof(messages)/sizeof(*messages));
+	if (strlen(result) < maxsize)
+		strcpy (buffer, result);
+	else
+		strncpy(buffer, result, maxsize);
+	// HAL_Delay(1000);
+	return buffer;
 }
+
+
+#include "NBinterface.h"
+#include "southbound_ec.h"
+
+
+struct st_cparams {
+	char		ip[128];
+	char		port[128];
+	char		user[128];
+	char		pswd[128];
+	char		lip[128];
+	char		lport[128];
+	char		luser[128];
+	char		lpswd[128];
+	char		dstat[128];
+} 	connection_params;
+
 
 
 int	SaveConnParams(){
-	return SaveALL();
-}
+//	char *p;
+//	p = GetVariable("IP");
+	strcpy (connection_params.ip , GetVariable("IP"));
+	strcpy (connection_params.port , GetVariable("PORT"));
+	strcpy (connection_params.user , GetVariable("USER"));
+	strcpy (connection_params.pswd , GetVariable("PSWD"));
+	strcpy (connection_params.lip , GetVariable("LIP"));
+	strcpy (connection_params.lport , GetVariable("LPORT"));
+	strcpy (connection_params.luser , GetVariable("LUSER"));
+	strcpy (connection_params.lpswd , GetVariable("LPSWD"));
+	strcpy (connection_params.dstat , GetVariable("DSTAT"));
 
-int	SaveAppParams(){
-	return SaveALL();
+	MIC_Flash_Memory_Write((const uint8_t *) &connection_params, (uint32_t)sizeof(connection_params));
+	return 1;
 }
-
-int	SaveBLParams(){
-	return SaveALL();
-}
-
 
 int RecConnParams(){
-	MIC_Flash_Memory_Read( (const uint8_t *) store, sizeof(store));
-	WriteData((char *) store);
+	MIC_Flash_Memory_Read( (const uint8_t *) &connection_params, sizeof(connection_params));
+
+	if ( (*(connection_params.ip) != 0xFF) ){
+		SetVariable("IP", connection_params.ip);
+		SetVariable("PORT", connection_params.port);
+		SetVariable("USER", connection_params.user);
+		SetVariable("PSWD", connection_params.pswd);
+		SetVariable("LIP", connection_params.lip);
+		SetVariable("LPORT", connection_params.lport);
+		SetVariable("LUSER", connection_params.luser);
+		SetVariable("LPSWD", connection_params.lpswd);
+		if ( (*(connection_params.dstat) != 0xFF) ){
+			SetVariable("DSTAT", connection_params.dstat);
+		}
+	}
+	return 1;
 }
 
-int RecAppParams(){
-	MIC_Flash_Memory_Read( (const uint8_t *) store, sizeof(store));
-	WriteData((char *) store);
+void wait_milliseconds(unsigned int miliseg);
+
+void TimingDelayMicro(unsigned int tick)
+{
+	wait_milliseconds(tick);
 }
 
-
-// Utility function to convert 4 chars in IEEE-754 Floating Point to a double
-// ONLY used in CAN reads
-double 	ieee2real (unsigned char data[]){
-	int sign;
-	int mantissa;
-	unsigned char exp;
-	double result;
-
-	sign = data[3] >> 7;
-	exp = ((data[3] & 0x7F) << 1 ) |  ((data[2] & 0x80) >> 7);
-	mantissa = data[0] | data[1] << 8 | (data[2] & 0x7F) << 16;
-
-	result = (sign?-1:1) * (double)(mantissa + 0x7FFFFF)/(double) 0x7FFFFF   * pow (2, exp - 127);
-
-	return result;
+uint32_t getMsecTimestamp(void)
+{
+	return  HAL_GetTick();
 }
 
+uint32_t howManyMsecPassed(uint32_t since)
+{
+	uint32_t now = HAL_GetTick();
 
-#include <stdlib.h>
-long	getHSsize (void){
-	char	stack = 0;
-	char	*heap = malloc(100);
-	unsigned long size =   &stack - heap;
-	free	(heap);
-	return size;
+	if (now < since) return (UINT32_MAX - since + now);
+
+	return (now - since);
+
 }
 
+static const double mDR = M_PI / 180;
+static const double mK1 = 15 * (M_PI / 180) * 1.0027379;
 
-char *textCert =
-"-----BEGIN CERTIFICATE-----\n"
-"MIIEATCCAumgAwIBAgIJALFjqVBg1LHlMA0GCSqGSIb3DQEBCwUAMIGWMQswCQYD"
-"VQQGEwJFUzEPMA0GA1UECAwGTWFkcmlkMQ8wDQYDVQQHDAZNYWRyaWQxEDAOBgNV"
-"BAoMB1NpbmFwc2UxFDASBgNVBAsMC0RldmVsb3BtZW50MQ0wCwYDVQQDDARNUVRU"
-"MS4wLAYJKoZIhvcNAQkBFh9yYWZhLmFsY2FpZGVAc2luYXBzZWVuZXJnaWEuY29t"
-"MB4XDTE3MDkxNDExMjY0MloXDTIyMDkxNDExMjY0MlowgZYxCzAJBgNVBAYTAkVT"
-"MQ8wDQYDVQQIDAZNYWRyaWQxDzANBgNVBAcMBk1hZHJpZDEQMA4GA1UECgwHU2lu"
-"YXBzZTEUMBIGA1UECwwLRGV2ZWxvcG1lbnQxDTALBgNVBAMMBE1RVFQxLjAsBgkq"
-"hkiG9w0BCQEWH3JhZmEuYWxjYWlkZUBzaW5hcHNlZW5lcmdpYS5jb20wggEiMA0G"
-"CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDCfuQkv6LrQoyynZMi4jsmGgQ32geK"
-"5v7fYWCH3dB7f6KVDozRraFW4a9vqkhQEpwmMcXZ6+aI/NaFW0ifc16BKdXXMslw"
-"aJmQIBbBgrpXCYCmED7v4h8bBYNoA+/yIqo+EAYfLSYwMvM/9D7n2x28LiytuNsf"
-"Nsga6tToN2rIIfsMrCRxBT4Ex8NKlpyRF0EO29jbZFrlUXp0wqowZFobgM5mgNjG"
-"MSYzPJFvlF/Hlp5XL2MM5nbgWWYgGk6w2Ep79gR4a32Np0Gq8C3r7avv29num6Mu"
-"3pKp+wiBUtZzafNHGqbRClcQEUZk7E6K/yXRqEfOdBO1RZE99/orO7vTAgMBAAGj"
-"UDBOMB0GA1UdDgQWBBT4A15SVpWhKsWWWD9nWnn91bPVDDAfBgNVHSMEGDAWgBT4"
-"A15SVpWhKsWWWD9nWnn91bPVDDAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBCwUA"
-"A4IBAQBdkrJkQ5f6wA+FoofKy19GewXWtn6UTnE1U/dVehJmB8WXxnLZAqH7aPq8"
-"kFN+MsAXa6qaLe9C52ne75bop8rzLE73fcWjRtfbJr5fovk32jF20VL0QhjRfwko"
-"pRqqrYBoDMzpvyzPaJnPEcqyVf+MHVPqaRdnXz/9Qqumu9yz09XVBPL6KkskpQgj"
-"oZs2jpCPSDhAavzNTJzQuJmVYj5eYTBBMmg8y9UENqvmQsUPFx8lAcWF/BcKLBH5"
-"BMCnZ9MYAwA4kwMpv4/yeKfDShF9RbG2U6rSbW0Rv4bpS5IuKBgIyWdfJf3Qcb1c"
-"IsqfjZ5GlW+Gih34ZxlzNYEAjm/j\n"
-"-----END CERTIFICATE-----";
+static double mRightAscentionArr[3] = { 0.0, 0.0, 0.0 };
+static double mDecensionArr[3] = { 0.0, 0.0, 0.0 };
+static double mVHzArr[3] = { 0.0, 0.0, 0.0 };
 
+static int mRiseTimeArr[2] = { 0, 0 };
+static int mSetTimeArr[2] = { 0, 0 };
+static double mRizeAzimuth = 0.0;
+static double mSetAzimuth = 0.0;
 
-unsigned char	*getCertificateTxt(size_t *lcert){
-	*lcert = strlen(textCert);
-	return textCert;
+static bool mIsSunrise = false;
+static bool mIsSunset = false;
+
+static double GetJulianDay(int year, int month, int day)
+{
+    bool gregorian = (year < 1583) ? false : true;
+
+    if ((month == 1) || (month == 2))
+    {
+        year = year - 1;
+        month = month + 12;
+    }
+
+    double a = floor((double)year / 100);
+    double b = 0;
+
+    if (gregorian)
+        b = 2 - a + floor(a / 4);
+    else
+        b = 0.0;
+
+    double jd = floor(365.25 * (year + 4716))
+               + floor(30.6001 * (month + 1))
+               + day + b - 1524.5;
+
+    return jd;
 }
 
+static double LocalSiderealTimeForTimeZone(double lon, double jd, double z)
+{
+    double s = 24110.5 + 8640184.812999999 * jd / 36525 + 86636.6 * z + 86400 * lon;
+    s = s / 86400;
+    s = s - floor(s);
+    return s * 360 * mDR;
+}
 
+static void CalculateSunPosition(double jd, double ct,
+                                 double* outSunPositionInSky0,
+                                 double* outSunPositionInSky1)
+{
+    double g, lo, s, u, v, w;
 
+    lo = 0.779072 + 0.00273790931 * jd;
+    lo = lo - floor(lo);
+    lo = lo * 2 * M_PI;
 
+    g = 0.993126 + 0.0027377785 * jd;
+    g = g - floor(g);
+    g = g * 2 * M_PI;
+
+    v = 0.39785 * sin(lo);
+    v = v - 0.01 * sin(lo - g);
+    v = v + 0.00333 * sin(lo + g);
+    v = v - 0.00021 * ct * sin(lo);
+
+    u = 1 - 0.03349 * cos(g);
+    u = u - 0.00014 * cos(2 * lo);
+    u = u + 0.00008 * cos(lo);
+
+    w = -0.0001 - 0.04129 * sin(2 * lo);
+    w = w + 0.03211 * sin(g);
+    w = w + 0.00104 * sin(2 * lo - g);
+    w = w - 0.00035 * sin(2 * lo + g);
+    w = w - 0.00008 * ct * sin(g);
+
+    // compute sun's right ascension
+    s = w / sqrt(u - v * v);
+    *outSunPositionInSky0 = lo + atan(s / sqrt(1 - s * s));
+
+    // ...and declination
+    s = v / sqrt(u);
+    *outSunPositionInSky1 = atan(s / sqrt(1 - s * s));
+}
+
+static int Sign(double value)
+{
+    int rv = 0;
+
+    if (value > 0.0) rv = 1;
+    else if (value < 0.0) rv = -1;
+    else rv = 0;
+
+    return rv;
+}
+
+static double TestHour(int k, double zone, double t0, double lat)
+{
+    double ha[3];
+    double a, b, c, d, e, s, z;
+    double time;
+    int hr, min;
+    double az, dz, hz, nz;
+
+    ha[0] = t0 - mRightAscentionArr[0] + k * mK1;
+    ha[2] = t0 - mRightAscentionArr[2] + k * mK1 + mK1;
+
+    ha[1] = (ha[2] + ha[0]) / 2;    // hour angle at half hour
+    mDecensionArr[1] = (mDecensionArr[2] + mDecensionArr[0]) / 2;  // declination at half hour
+
+    s = sin(lat * mDR);
+    c = cos(lat * mDR);
+    z = cos(90.833 * mDR);    // refraction + sun semidiameter at horizon
+
+    if (k <= 0)
+        mVHzArr[0] = s * sin(mDecensionArr[0]) + c * cos(mDecensionArr[0]) * cos(ha[0]) - z;
+
+    mVHzArr[2] = s * sin(mDecensionArr[2]) + c * cos(mDecensionArr[2]) * cos(ha[2]) - z;
+
+    if (Sign(mVHzArr[0]) == Sign(mVHzArr[2]))
+        return mVHzArr[2];  // no event this hour
+
+    mVHzArr[1] = s * sin(mDecensionArr[1]) + c * cos(mDecensionArr[1]) * cos(ha[1]) - z;
+
+    a = 2 * mVHzArr[0] - 4 * mVHzArr[1] + 2 * mVHzArr[2];
+    b = -3 * mVHzArr[0] + 4 * mVHzArr[1] - mVHzArr[2];
+    d = b * b - 4 * a * mVHzArr[0];
+
+    if (d < 0)
+        return mVHzArr[2];  // no event this hour
+
+    d = sqrt(d);
+    e = (-b + d) / (2 * a);
+
+    if ((e > 1) || (e < 0))
+        e = (-b - d) / (2 * a);
+
+    time = (double)k + e + (double)1 / (double)120; // time of an event
+
+    hr = (int)floor(time);
+    min = (int)floor((time - hr) * 60);
+
+    hz = ha[0] + e * (ha[2] - ha[0]);                 // azimuth of the sun at the event
+    nz = -cos(mDecensionArr[1]) * sin(hz);
+    dz = c * sin(mDecensionArr[1]) - s * cos(mDecensionArr[1]) * cos(hz);
+    az = atan2(nz, dz) / mDR;
+    if (az < 0) az = az + 360;
+
+    if ((mVHzArr[0] < 0) && (mVHzArr[2] > 0))
+    {
+        mRiseTimeArr[0] = hr;
+        mRiseTimeArr[1] = min;
+        mRizeAzimuth = az;
+        mIsSunrise = true;
+    }
+
+    if ((mVHzArr[0] > 0) && (mVHzArr[2] < 0))
+    {
+        mSetTimeArr[0] = hr;
+        mSetTimeArr[1] = min;
+        mSetAzimuth = az;
+        mIsSunset = true;
+    }
+
+    return mVHzArr[2];
+}
+
+bool CalculateSunRiseSetTimes(double lat, double lon,
+                              int year, int month, int day,
+                              int* outRiseHour, int* outRiseMinute,
+                              int* outSetHour, int* outSetMinute)
+{
+    mRiseTimeArr[0] = 0;
+    mRiseTimeArr[1] = 0;
+    mSetTimeArr[0] = 0;
+    mSetTimeArr[1] = 0;
+    mRizeAzimuth = 0.0;
+    mSetAzimuth = 0.0;
+
+    double zone = 0;
+    double jd = GetJulianDay(year, month, day) - 2451545;  // Julian day relative to Jan 1.5, 2000
+
+    if ((Sign(zone) == Sign(lon)) && (zone != 0)) return false;
+
+    lon = lon / 360;
+    double tz = zone / 24;
+    double ct = jd / 36525 + 1;                                 // centuries since 1900.0
+    double t0 = LocalSiderealTimeForTimeZone(lon, jd, tz);      // local sidereal time
+
+    // get sun position at start of day
+    jd += tz;
+    double ra0, dec0;
+    CalculateSunPosition(jd, ct, &ra0, &dec0);
+
+    // get sun position at end of day
+    jd += 1;
+    double ra1, dec1;
+    CalculateSunPosition(jd, ct, &ra1, &dec1);
+
+    // make continuous
+    if (ra1 < ra0)
+        ra1 += 2 * M_PI;
+
+    // initialize
+    mIsSunrise = false;
+    mIsSunset = false;
+
+    mRightAscentionArr[0] = ra0;
+    mDecensionArr[0] = dec0;
+
+    // check each hour of this day
+    for (int k = 0; k < 24; k++)
+    {
+        mRightAscentionArr[2] = ra0 + (k + 1) * (ra1 - ra0) / 24;
+        mDecensionArr[2] = dec0 + (k + 1) * (dec1 - dec0) / 24;
+        mVHzArr[2] = TestHour(k, zone, t0, lat);
+
+        // advance to next hour
+        mRightAscentionArr[0] = mRightAscentionArr[2];
+        mDecensionArr[0] = mDecensionArr[2];
+        mVHzArr[0] = mVHzArr[2];
+    }
+
+    *outRiseHour = mRiseTimeArr[0];
+    *outRiseMinute = mRiseTimeArr[1];
+    *outSetHour = mSetTimeArr[0];
+    *outSetMinute = mSetTimeArr[1];
+
+    /*
+    isSunset = true;
+    isSunrise = true;
+
+    // neither sunrise nor sunset
+    if ((!mIsSunrise) && (!mIsSunset))
+    {
+        if (mVHzArr[2] < 0)
+            isSunrise = false; // Sun down all day
+        else
+            isSunset = false; // Sun up all day
+    }
+    // sunrise or sunset
+    else
+    {
+        if (!mIsSunrise)
+            // No sunrise this date
+            isSunrise = false;
+        else if (!mIsSunset)
+            // No sunset this date
+            isSunset = false;
+    }
+    */
+
+    return true;
+}
+
+/*****************************************************************************
+ * Function name    : ConvertArraytoInteger
+ * 	  @brief		: Auxiliary function to convert a boolean array to decimal value
+ *
+ *    @param1       : array1: bytes array 1/0
+ *    @param2       : tam: size array
+ *
+ * 	  @retval       : Returns a decimal value
+ *
+ * 	  Notes         : This function is only used for DEBUG purpose
+ *****************************************************************************/
+uint8_t ConvertArraytoInteger(char *array, uint8_t tam)
+{
+
+	uint8_t ret = 0;
+	uint8_t tmp;
+
+	for (uint8_t i = 0; i < tam; i++) {
+		tmp = array[i];
+		ret |= tmp << (tam - i - 1);
+	}
+	return ret;
+}

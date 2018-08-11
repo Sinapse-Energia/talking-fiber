@@ -20,6 +20,12 @@
 
 #include <string.h>
 
+#include "Definitions.h"
+#if defined(DEBUG_ENABLE_MQTT_QUEUE_PUB)
+#include "MQTTAPI.H"
+extern int hmqtt;
+#endif
+
 /**
  * Encodes the message length according to the MQTT algorithm
  * @param buf the buffer into which the encoded data is written
@@ -311,6 +317,22 @@ int MQTTPacket_read(unsigned char* buf, int buflen, int (*getfn)(unsigned char*,
 
 	header.byte = buf[0];
 	rc = header.bits.type;
+
+#if defined(DEBUG_ENABLE_MQTT_QUEUE_PUB)
+	char txtbuf[256];
+	size_t bias = sprintf(txtbuf, "MQTT RX ");
+	for (size_t i = 0; i < (rem_len + len); i++)
+	{
+		if (bias > 250)
+		{
+			sprintf(&txtbuf[bias], "...");
+			break;
+		}
+		bias += sprintf(&txtbuf[bias], "%02X ", buf[i]);
+	}
+	MqttPutMessage(hmqtt, topicmqdebug, txtbuf);
+#endif
+
 exit:
 	return rc;
 }
