@@ -100,6 +100,28 @@ float randFloat(float min, float max)
 	PLACEHOLDERS for the real READING wrappers
 *************************************************/
 
+char *Read_TFVOL(const char *value)
+{
+	//HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_SET);
+	//HAL_Delay(100);
+	// Read ADC diode voltage
+	float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6);
+	// PFM_TO_ANALOGUE = (VDD_PHOTODIODE/2)-R_23_1*Iphotodiode
+	float Iphotodiode = (VDD_PHOTODIODE/2 - pfm_to_analogue) / R_23_1;
+	//HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_RESET);
+
+	// Set timestamp
+	char tsbuf[16];
+	long ts = GetTimeStamp();
+	snprintf(tsbuf, 16, "%li", ts);
+	SetVariable((char*)"TFVTS", tsbuf);
+
+	// Set voltage value
+	static char tfvoltbuf[16];
+	snprintf(tfvoltbuf, 16, "%d.%02d", (int)Iphotodiode, abs((int)(Iphotodiode*100.0f))%100);
+	return tfvoltbuf;
+}
+
 char *Read_LTIME(const char *value)
 {
 	return GetDateTime();
@@ -319,6 +341,8 @@ struct	st_wrapper	dispatch[] = {
 	"GPSSRT",		Read_GPSSRT,	NULL,
 	"NEWRT",		NULL,			Write_NEWRT,
 	"NEWID",		NULL,			Write_NEWID,
+
+	"TFVOL",		Read_TFVOL,		NULL,
 
 	NULL
 };

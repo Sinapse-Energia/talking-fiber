@@ -115,6 +115,9 @@ static const DevParam_T devParams[] = {
         { "BTLVER",   "",                               TYPE_STR }, // 213 73
         { "BTLRES",   "0",                              TYPE_INT },
         { "NEWRT",    "-1",                             TYPE_STR },
+
+		{ "TFVOL",    "-1",                             TYPE_STR },
+		{ "TFVTS",    "0",                              TYPE_INT },
 };
 // This variable needed to control places in code that rely on devParams array
 // You should change this variable each time you change devParams array
