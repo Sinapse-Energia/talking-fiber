@@ -54,9 +54,9 @@ static const DevParam_T devParams[] = {
         { "BMPSW", "",                                  TYPE_STR },
         { "MCLID", "",                                  TYPE_STR },
         { "MTPRT", "TESTING_TF",                        TYPE_STR },
-        { "DODPT", "CMC/MEASUREMENTS",                  TYPE_STR },
-        { "DOPPT", "CMC/PERIODIC",                      TYPE_STR },
-        { "DALPT", "CMC/ALERTS",                        TYPE_STR },
+        { "DODPT", "TF/MEASUREMENTS",                   TYPE_STR },
+        { "DOPPT", "TF/PERIODIC",                       TYPE_STR },
+        { "DALPT", "TF/ALERTS",                         TYPE_STR },
         { "EODPT", "EPD/MEASUREMENTS",                  TYPE_STR },
         { "EOPPT", "EPD/PERIODIC",                      TYPE_STR },
         { "EALPT", "EPD/ALERTS",                        TYPE_STR }, // 20
@@ -400,6 +400,7 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 		"CUAAN%610;TRUE;%customize AP answer%%",
 		"RETFW%609;$ID;$BTLVER;%return FW version%%",
 
+		"L3TFR%L3_TF_STATUS_R;$ID;$TFVOL;$TFVTS;%return photodiode voltage%%",
 
 		NULL
 	};
@@ -414,6 +415,8 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 		"BTACT%208;$BTLAUS;$BTLAPS;%boot act%xx%BTANS%",
 		"CUSAP%210;$NEWID;$NEWRT;%customize AP%xx%CUAAN%",
 		"REQFW%209;%request FW ver%xx%RETFW%",
+
+		"L3TFD%L3_TF_STATUS_OD;%request diode voltage%xx%L3TFR%",
 
 		NULL
 	};

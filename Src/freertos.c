@@ -462,6 +462,7 @@ void schedulerTriggersProc(void const * argument)
 	int i;
 	long lastAbsMinuteCMC = 0;
 	int today = 0; // Current day, used for sunrise/sunset calculation
+	int prevMinute = 0;
 #if defined(TIME_CORRECT_PERIODICALLY)
 	int lastTimeCorrectHour = 0;
 #endif
@@ -573,6 +574,26 @@ void schedulerTriggersProc(void const * argument)
 		// Get now hour and minute
 		int nowHour = atoi(getHour());
 		int nowMinute = atoi(getMinute());
+
+		if (nowMinute != prevMinute)
+		{
+			prevMinute = nowMinute;
+
+			ContextLock();
+			char *out = ProcessMessage("L3_TF_STATUS_OD;");
+			ContextUnlock();
+			// put out into send buffer
+			if ((uint32_t)out != 0)
+			{
+				char outtopic[64];
+				// Topic to publish answer
+				sprintf(outtopic, "%s/%s",
+						GetVariable("MTPRT"),
+						GetVariable("DOPPT"));
+				threadSafeQueueEnqueue(publishQueue, outtopic);
+				threadSafeQueueEnqueue(publishQueue, out);
+			}
+		}
 
 #if defined(TIME_CORRECT_PERIODICALLY)
 		if (lastTimeCorrectHour != nowHour &&
