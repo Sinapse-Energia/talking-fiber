@@ -171,7 +171,7 @@ uint32_t adc_read_code(uint32_t channel)
 
 float adc_read_avdd()
 {
-	return (AVDD_EXPECTED * VREFINT_CAL / adc_read_code(ADC_CHANNEL_VREFINT));
+	return (AVDD_EXPECTED);// * VREFINT_CAL / adc_read_code(ADC_CHANNEL_VREFINT));
 }
 
 float adc_read_val(uint32_t channel)

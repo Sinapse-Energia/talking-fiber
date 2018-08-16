@@ -105,9 +105,9 @@ char *Read_TFVOL(const char *value)
 	//HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_SET);
 	//HAL_Delay(100);
 	// Read ADC diode voltage
-	float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6);
+	float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6) * 1000; // in mV
 	// PFM_TO_ANALOGUE = (VDD_PHOTODIODE/2)-R_23_1*Iphotodiode
-	float Iphotodiode = (VDD_PHOTODIODE/2 - pfm_to_analogue) / R_23_1;
+	//float Iphotodiode = (VDD_PHOTODIODE/2 - pfm_to_analogue) / R_23_1;
 	//HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_RESET);
 
 	// Set timestamp
@@ -118,7 +118,7 @@ char *Read_TFVOL(const char *value)
 
 	// Set voltage value
 	static char tfvoltbuf[16];
-	snprintf(tfvoltbuf, 16, "%d.%02d", (int)Iphotodiode, abs((int)(Iphotodiode*100.0f))%100);
+	snprintf(tfvoltbuf, 16, "%d.%02d", (int)pfm_to_analogue, abs((int)(pfm_to_analogue*100.0f))%100);
 	return tfvoltbuf;
 }
 
