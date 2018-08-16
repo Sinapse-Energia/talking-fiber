@@ -106,23 +106,22 @@
 
 /* USER CODE BEGIN Private defines */
 
-#define M95_CTRL_EMERG_GPIO_Port 	CTRL_EMERG_RESET_GPIO_Port
-#define M95_CTRL_PWRKEY_GPIO_Port 	CONTROL_PWRKEY_GPIO_Port
-#define M95_STATUS_GPIO_Port 		STATUS_GPIO_Port
+#define COMMUNICATION_M95 // M95 device is tied, and it is going to be used to communicate
 
-#define M95_CTRL_EMERG_Pin 			CTRL_EMERG_RESET_Pin
-#define M95_CTRL_PWRKEY_Pin 		CONTROL_PWRKEY_Pin
-#define M95_STATUS_Pin 				STATUS_Pin
 
-#ifdef __cplusplus
- extern "C" {
-#endif
+#define Emerg_Pin CTRL_EMERG_RESET_Pin
+#define Emerg_GPIO_Port CTRL_EMERG_RESET_GPIO_Port
+#define Pwrkey_Pin CONTROL_PWRKEY_Pin
+#define Pwrkey_GPIO_Port CONTROL_PWRKEY_GPIO_Port
+#define M95Status_Pin STATUS_Pin
+#define M95Status_GPIO_Port STATUS_GPIO_Port
 
-int	COMM_Init();
-
-#ifdef __cplusplus
-}
-#endif
+#define blueON HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin,GPIO_PIN_RESET)
+#define blueOFF HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin,GPIO_PIN_SET)
+#define redON HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin,GPIO_PIN_RESET)
+#define redOFF HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin,GPIO_PIN_SET)
+#define greenON HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin,GPIO_PIN_RESET)
+#define greenOFF HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin,GPIO_PIN_SET)
 
 /* USER CODE END Private defines */
 

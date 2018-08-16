@@ -10,10 +10,10 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	"context.h"
-#include 	"Definitions.h"
 
-#include "NBinterface.h"
-#include "wrsouth.h"
+
+#include 	"NBinterface.h"
+#include 	"wrsouth.h"
 
 
 //		This is an out-of-Context variable,
@@ -32,7 +32,7 @@ CVariable *CVariable::Dummy = new CVariable ("Dummy",			"",		new CVarstring("???
 //	a variable contents in text form
 //	Has extern cdcl storage for C calling
 /////////////////////////////////////////////
-char	*GetVariable	(char *name) {
+char	*GetVariable	(const char *name) {
 	CVariable	*v = CVariable::get(name);
 	if (v){
 		char *result = v->read(false);
@@ -47,7 +47,7 @@ char	*GetVariable	(char *name) {
 //	in a variable
 //	Has extern cdcl storage for C calling
 /////////////////////////////////////////////
-int		SetVariable	(char *name, char *value){
+int		SetVariable	(const char *name, char *value){
 	CVariable	*v = CVariable::get(name);
 	if (v) {
 		v->write(value);
@@ -58,8 +58,78 @@ int		SetVariable	(char *name, char *value){
 }
 
 
+CVarint			*GetIntVar	(const char *name){
+	CVariable *var = CVariable::get(name);
+	if (var) {
+		CVariant *cont = var->Content();
+		if (cont->Kind() == INT){
+			return (CVarint *) cont;
+		}
+	}
+	return NULL;
+}
+
+CVardec			*GetDecVar	(const char *name){
+	CVariable *var = CVariable::get(name);
+	if (var) {
+		CVariant *cont = var->Content();
+		if (cont->Kind() == DEC){
+			return (CVardec *) cont;
+		}
+	}
+	return NULL;
+}
+
+CVarstring			*GetStringVar	(const char *name){
+	CVariable *var = CVariable::get(name);
+	if (var) {
+		CVariant *cont = var->Content();
+		if (cont->Kind() == STRING){
+			return (CVarstring *) cont;
+		}
+	}
+	return NULL;
+}
+			
+CVartime			*GetTimeVar	(const char *name){
+	CVariable *var = CVariable::get(name);
+	if (var) {
+		if (1) { // pending to decide how to filter..
+			var->Evaluate();
+		}
+		CVariant *cont = var->Content();
+		if (cont->Kind() == TIME){
+			return (CVartime *) cont;
+		}
+	}
+	return NULL;
+}
 
 
+CVartuple			*GetTupleVar	(const char *name){
+	CVariable *var = CVariable::get(name);
+	if (var) {
+		CVariant *cont = var->Content();
+		if (cont->Kind() == TUPLE){
+			return (CVartuple *) cont;
+		}
+	}
+	return NULL;
+}
+
+
+
+CVarlist			*GetListVar	(const char *name){
+	CVariable *var = CVariable::get(name);
+	if (var) {
+		CVariant *cont = var->Content();
+		if (cont->Kind() == LIST){
+			return (CVarlist *) cont;
+		}
+	}
+	return NULL;
+}
+	
 
 
 /////////////// CLASS CVARIABLE IMPLEMENTATION ////////////
@@ -90,7 +160,7 @@ CVariable::CVariable (const char *_name, const char *_nick, CVariant *content) {
 		this->ns = NULL;
 
 
-	//this->name = strdup(_name);
+	this->name = strdup(_name);
 
 	this->nick = strdup(_nick);
 	this->value  = content;
@@ -113,16 +183,25 @@ CVariable *CVariable::get(const char *id) {
 	return Dummy;
 }
 
+bool	CVariable::Evaluate(){
+	const char *newval = GenericREAD(this);
+	if (newval) {
+		this->value->write (newval);
+		return true;
+	}
+	else
+		return false;
 
+}
 
 // method to recover the contents of the var, converted to string
 char	*CVariable::read(bool evaluate)  {
-	//int traza = 0;
+	int traza = 0;
 	if (1) {  // auto update on read
 	time_t now = time(NULL);
 	//	if (now - this->tstamp  > this->lifetime) {
 	if (evaluate) {
-		//if (traza) printf ("VOY a evaluar %s porque se ha quedao viejo\n", this->name );
+			if (traza) printf ("VOY a evaluar %s porque se ha quedao viejo\n", this->name );
 			const char *newval = GenericREAD(this);
 			if (newval) {
 				this->value->write (newval);
@@ -148,10 +227,7 @@ CVariable *CVariable::write (const char *txt, unsigned char options) {
 	else {
 		this->value->write(txt);  // on the own context variable
 	}
-	const char *newval = GenericWRITE(this, txt);
-	if (newval) {
-	    this->value->write(newval);
-	}
+	GenericWRITE(this, txt);
 	this->tstamp = time(NULL);
 	return this;
 }
@@ -175,27 +251,7 @@ void	*GetSubspaceElement	(const char *prefix, const char *id){
 		return NULL;
 }
 
-unsigned int GetSubspaceElementsCount(const char* prefix){
-	unsigned int	result;
-	CSubspace *psub = CSubspace::get(prefix);
-	if (psub) {
-		result =  psub->ElementsCount();
-		return result;
-	}
-	else
-		return 0;
-}
 
-const char	*GetSubspaceElementByIndex	(const char *prefix, unsigned int n){
-	const char	*result;
-	CSubspace *psub = CSubspace::get(prefix);
-	if (psub) {
-		result =  psub->getElementbyIndex(n);
-		return result;
-	}
-	else
-		return NULL;
-}
 
 CSubspace	*CSubspace::List[MAX_SUBSPACES];
 unsigned int	CSubspace::nsubspaces = 0;
@@ -255,7 +311,7 @@ int	CSubspace::Restore() {
 
 int	CSubspace::RestoreAll() {
 	for (unsigned int i = 0; i < nsubspaces; i++) {
-		printf ("Restaurando el %d\n", i);
+		printf ("Restoring el %d\n", i);
 		List[i]->Restore(); 
 	}
 	return 1;
@@ -299,28 +355,28 @@ char total[CELLSIZE];
 
 ////////////////////////////////////////////////////////////////////////////
 //	Function, that takes the data stream from NVM 
-//		splits it in elements, and, one by one, wirtes them into de Context
+//		splits it in elements, and, one by one, writes them into de Context
 //	Formerly was part of Swap-In, but has been factorized-out because 
-//		the same functionality is requiered ein Restore 
+//		the same functionality is required in Restore
 ////////////////////////////////////////////////////////////////////////////  
 void	WriteData(char *p) {
 		while (p) {
-			char	nombre[16];
-			char	valor[64];
+			char	name[16];
+			char	value[128];
 
 			char *q = strstr(p, "=");
 			if (q) {
-				strncpy(nombre, p, q-p);
-				nombre[q-p] = 0;
+				strncpy(name, p, q-p);
+				name[q-p] = 0;
 				p = q+1;
 				q = strstr(p, ";");
 				if (q) {
-					strncpy(valor, p, q-p);
-					valor[q-p] = 0;
+					strncpy(value, p, q-p);
+					value[q-p] = 0;
 					p = q+1;
-					CVariable *x = CVariable::get(nombre);
-					x->Value()->write(valor);
-////				x->write(valor);  Avoid recursion ???
+					CVariable *x = CVariable::get(name);
+//					x->Content()->write(value);
+					x->write(value);  // Avoid recursion ???
 				}
 				else
 					p = 0;
@@ -334,8 +390,6 @@ void	WriteData(char *p) {
 
 
 int	CSubspace::SwapIn (const char *id, unsigned char options) {
-	//unsigned int		i =0;
-	//int		trace = 0;
 //	table_entry *px = (table_entry *) bsearch(id, this->index, this->number, sizeof(table_entry), compare_entries);
 	table_entry *px = this->getEntry(id);
 	if (px) {
@@ -348,9 +402,6 @@ int	CSubspace::SwapIn (const char *id, unsigned char options) {
 		if ((number < MAX_TABLE_SIZE) && (options & 1)){
 			index[number].position = number;
 			strcpy (index[number].id, id);
-			// FILL with defauts??
-
-
 			number++;
 		    qsort(index, number, sizeof(table_entry), compare_entries);
 			return 1;
@@ -367,20 +418,26 @@ int	CSubspace::SwapIn (const char *id, unsigned char options) {
 
 int	CSubspace::SwapOut () {
 
-	//int		trace = 0;
 	unsigned int		i =0;
 	char	pk[32];
 	sprintf (pk, "%s::%s", prefix, prefix);
 	char * xid = GetVariable(pk);
-	if (xid) {
+	if (xid && *xid) {
 		table_entry *px;
 		unsigned int pos;
 		total[0] = 0;
 		total[CELLSIZE-1] = '\n';
 
 		while (i < this->nitems ) {
-			sprintf ((char *) total, "%s%s=%s;",  total, this->items[i]->Id(), this->items[i]->read(false) );
-			i++;
+			char	element[64];
+			sprintf (element, "%s=%s;",  this->items[i]->Id(), this->items[i]->read(false) );
+			if (strlen(total) + strlen(element) < CELLSIZE){
+				strcat(total, element);
+				i++;
+			}
+			else {
+				break;
+			}
 		}
 		strcat (total, "\n");
 

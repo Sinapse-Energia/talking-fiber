@@ -54,8 +54,6 @@
 
 /* USER CODE BEGIN 0 */
 
-#include "Definitions.h"
-
 /* USER CODE END 0 */
 
 ADC_HandleTypeDef hadc1;
@@ -151,33 +149,6 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 } 
 
 /* USER CODE BEGIN 1 */
-
-uint32_t adc_read_code(uint32_t channel)
-{
-    uint32_t code;
-    ADC_ChannelConfTypeDef sConfig;
-
-    sConfig.Channel = channel;
-    sConfig.Rank = 1;
-    sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
-
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 10000);
-    code = HAL_ADC_GetValue(&hadc1);
-    HAL_ADC_Stop(&hadc1);
-    return code;
-}
-
-float adc_read_avdd()
-{
-	return (AVDD_EXPECTED);// * VREFINT_CAL / adc_read_code(ADC_CHANNEL_VREFINT));
-}
-
-float adc_read_val(uint32_t channel)
-{
-	return (adc_read_code(channel) * adc_read_avdd() / ((1 << ADC_RES) - 1));
-}
 
 /* USER CODE END 1 */
 

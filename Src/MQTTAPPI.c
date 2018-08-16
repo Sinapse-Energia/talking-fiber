@@ -4,8 +4,7 @@
 #include "MQTTPacket.h"
 #include "MQTTAPI.H"
 #include "transport.h"
-#include "utils.h"
-#include  "NBinterface.h"
+#include "utils.h" // GetTimeStamp
 
 
 // this is a PROVISIONAL declaration, for using topic trace temporally
@@ -13,7 +12,7 @@ extern int		tprintf(int hcon, char *texto,...);
 
 
 
-#define BUFSIZE	256
+#define BUFSIZE	2048
 
 
 int		MqttConnectB(int handle, char *username, char *password) {
@@ -55,7 +54,7 @@ int		MqttConnectB(int handle, char *username, char *password) {
 	/* wait for connack */
 	/////////////// (4)  CHECK, para ver si es un CONNACK (PPT-3-a)
 
-	if (rc && (MQTTPacket_read(buf, buflen, transport_getdataMqttCtrl) == CONNACK))
+	if (rc && (MQTTPacket_read(buf, buflen, transport_getdata) == CONNACK))
 	{
 		unsigned char sessionPresent, connack_rc;
 
@@ -63,7 +62,8 @@ int		MqttConnectB(int handle, char *username, char *password) {
 		if (MQTTDeserialize_connack(&sessionPresent, &connack_rc, buf, buflen) != 1 || connack_rc != 0)
 		{
 			if (traza) printf("Unable to connect, return code %d\n", connack_rc);
-			return -1;
+			return (-(100+rc));
+//			return -1;
 		}
 		return handle;
 	}
@@ -76,9 +76,9 @@ int		MqttConnectB(int handle, char *username, char *password) {
 
 
 
-int		MqttConnect(const char	*host, unsigned int port, char *username, char *password) {
+int		MqttConnect(const char	*host, unsigned int port, int security, char *username, char *password) {
 
-	int handle = transport_open(host, port);
+	int handle = transport_open(host, port, security);
  //	handle = M95_ReConnect(host, port);
 	if (handle > 0)
 		 MqttConnectB(handle, username, password);
@@ -103,7 +103,7 @@ int		MqttSubscribe (int handle, char *topic){
 	/////////////// (6)  ENVIA Mssg SUSCRIPCION		PPT(4-b)
 	rc = transport_sendPacketBuffer(handle, buf, len);
 	/////////////// (7)  CHECK, para ver si es un SUBACK (PPT-5a)
-	rc = MQTTPacket_read(buf, buflen, transport_getdataMqttCtrl);
+	rc = MQTTPacket_read(buf, buflen, transport_getdata); 
 	/* check for suback */
 	if (rc == SUBACK) {
 		unsigned short submsgid;
@@ -133,13 +133,13 @@ int		MqttSubscribe (int handle, char *topic){
 //		el DeserializePublish lo reasigne a la zona del buf donde est�
 // O sea lo que obtengo en payload es una parte interna del buf
 //	Si el buf es local, hay que copiarlo o duplicarlo
-extern	char	*MqttGetMessage(int handle, char *_destination, int maxlen, char* topicbuf, int topicbufsize) {
+extern	char	*MqttGetMessage(int handle, char *_destination, int maxlen) {
 	int	traza = 0;
 	unsigned char	buf[BUFSIZE];
 //	MQTTString topicString = MQTTString_initializer;
 	int myrc;
 	if (traza) tprintf (handle, "Before PacketRead");
-	myrc = MQTTPacket_read(buf, maxlen, transport_getdataMqttPub);
+	myrc = MQTTPacket_read(buf, maxlen, transport_getdata);
 	if (traza) tprintf (handle, "PacketRead got %d rc", myrc);
 
 	if (myrc == PUBLISH) {
@@ -165,14 +165,6 @@ extern	char	*MqttGetMessage(int handle, char *_destination, int maxlen, char* to
 				tprintf(handle, "Payload  %.*s\n",payloadlen_in, p );
 			}
 			if (p) {
-				// getting topic
-				int cpsize = ((topicbufsize - 1) < receivedTopic.lenstring.len) ? (topicbufsize - 1) : receivedTopic.lenstring.len;
-				if (topicbuf != NULL)
-				{
-					memcpy(topicbuf, receivedTopic.lenstring.data, cpsize);
-					topicbuf[cpsize] = '\0';
-				}
-
 				// getch();
 				p[payloadlen_in] = 0;
 				strcpy (_destination, (char *) p);
@@ -196,36 +188,23 @@ extern	char	*MqttGetMessage(int handle, char *_destination, int maxlen, char* to
 }
 
 
-int MQTTSerialize_publishLength(int qos, MQTTString topicName, int payloadlen);
+
 
 int		MqttPutMessage(int handle, char	*topic, char *message){
 	/////////////// (*)  PUBLICA LO QUE SEA  (PPT missing)
 	int rc;
 	int traza = 0;  // has to be 0 as fas as calls tprintf, because if not, it recurses without end
 	MQTTString topicString = MQTTString_initializer;
-	unsigned char   constbuf[BUFSIZE];
-	unsigned char*	buf = &constbuf[0];
+	unsigned char	buf[BUFSIZE];
 	int		buflen = BUFSIZE;
 	int		len;
 	topicString.cstring = topic;
 
 	if (traza) tprintf(handle, "To Publish %s in topic %s \n", message, topic);
 	len = MQTTSerialize_publish(buf, buflen, 0, 0, 0, 0, topicString, (unsigned char*)message, strlen(message));
-	if (len == MQTTPACKET_BUFFER_TOO_SHORT)
-	{
-		int calclen = MQTTSerialize_publishLength(0, topicString, strlen(message)) + 32; /* maybe not need +32, but add for any case */
-		buf = malloc(calclen);
-		if (buf == NULL) return -1;
-		len = MQTTSerialize_publish(buf, calclen, 0, 0, 0, 0, topicString, (unsigned char*)message, strlen(message));
-		if (len < 1) return -1;
-	}
 	if (traza) tprintf(handle, "Message serialized to  %d bytes \n", len);
 	rc = transport_sendPacketBuffer(handle, buf, len);
 	if (traza) tprintf(handle, "Message sended with %d RC \n", rc);
-	if (buf != constbuf)
-	{
-		free(buf);
-	}
 	return rc;
 }
 
@@ -235,7 +214,8 @@ int		MqttCheck(int handle){
 }
 
 
-int		MqttDisconnect(int handle){
+
+int		MqttDisconnectB(int handle){
 	int len;
 	unsigned char	buf[BUFSIZE];
 	int		buflen = BUFSIZE;
@@ -246,8 +226,34 @@ int		MqttDisconnect(int handle){
 	len = MQTTSerialize_disconnect(buf, buflen);
 	rc = transport_sendPacketBuffer(handle, buf, len);
 
-	transport_close(handle);
 	return rc;
+}
+
+int		MqttDisconnect(int handle){
+	int rc = MqttDisconnectB(handle);
+	if (rc)
+		transport_close(handle);
+	return rc;
+}
+
+
+int		MqttReConnect		(int handle, char *host, int port, int security, char *username, char *password) {
+	int len;
+	unsigned char	buf[BUFSIZE];
+	int		buflen = BUFSIZE;
+	int		traza = 0;
+	int rc;
+
+//	rc = MqttDisconnectB(handle);
+	if (1) {
+		handle = transport_reopen(host, port, security);
+		if (handle > 0) {
+			handle = MqttConnectB(handle, username, password);
+		}
+		return handle;
+	}
+
+
 }
 
 
@@ -266,13 +272,13 @@ int			MqttPing(int handle){
 	if (traza) tprintf(handle, "PING sended with %d RC \n", rc);
 	if (rc) {
 		MQTTHeader header = {0};
-		if (transport_getdataMqttCtrl(buf, 1) == 1){
+		if (transport_getdata(buf, 1) == 1){
 			header.byte = buf[0];
 			if (header.bits.type == PINGRESP) {
 				if (traza) tprintf(handle, "ooooKKKK\n");
 				len = 1;
 				/* 2. read the remaining length.  Suposed ti be 0 */
-				MQTTPacket_decode(transport_getdataMqttCtrl, &rem_len);
+				MQTTPacket_decode(transport_getdata, &rem_len);
 				if (rem_len == 0)
 					rc = 1;
 				else
@@ -295,15 +301,16 @@ int			MqttPing(int handle){
 
 // Helper function to publish-out trace messages
 int		tprintf(int hcon, char *texto,...) {
-	int rc;
+	int rc = 0;
 	va_list	  ap;
 	char	  salida[512];
-
+	if (hcon) {
 	va_start	  (ap, texto);
-//	sprintf (salida, "Node %s :", GetVariable("ID"));
-	sprintf (salida, "Node %s <%s> ", GetVariable("ID"), strDateTime());
-	vsprintf (salida+strlen(salida), texto, ap);
+	//	sprintf (salida, "Node %s :", GetVariable("ID"));
+	//	sprintf (salida, "Node %s <%s> ", GetVariable("ID"), strDateTime());
+	vsprintf (salida, texto, ap);
 	rc = MqttPutMessage	(hcon, topictr, salida);
+	}
 	return rc;
 }
 

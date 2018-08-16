@@ -38,6 +38,7 @@
   // returns the number of chars available to read
   int		Stock (st_CB *cb) {
 	if (cb->hdma)
+		//cb->wrindex = cb->size - cb->hdma->Instance->CNDTR;
 		cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
   	int x = (cb->size + cb->wrindex - cb->rindex) % cb->size;
   	return x;
@@ -46,6 +47,7 @@
   //	To test if the Cbuffer is full or not (fits anything more)
   int		IsFull (st_CB *cb) {
 	if (cb->hdma)
+		//cb->wrindex = cb->size - cb->hdma->Instance->CNDTR;
 		cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
   	return (cb->rindex  == (cb->wrindex + 1) % cb->size);
   }
@@ -53,22 +55,36 @@
   // sets the reader equals to the writer
   int 	Reset(st_CB *cb) {
 	  if (cb->hdma)
-	  	cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
+	  	//cb->wrindex = cb->size - cb->hdma->Instance->CNDTR;
+		  cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
 	  int stock = Stock(cb);
-	  cb->rindex = cb->wrindex;
+	  if (stock)
+		  cb->rindex = cb->wrindex;
   	return stock;
   }
 
+int		Skip	(st_CB *cb, unsigned int n){
+	int z = Stock(cb);
+	if (z >= n) {
+		cb->rindex = (cb->rindex + n) % cb->size;
+		return n;
+	}
+	return 0;
+}
 
   // Reads ONE byte from the buffer...
   int		Read(st_CB *cb) {
+	  int clear = 0;
 	  if (cb->hdma)
-	  	cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
+	  	//cb->wrindex = cb->size - cb->hdma->Instance->CNDTR;
+		  cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
 	  if (cb->rindex == cb->wrindex)
 		  return -1;
 	  else {
 		  int nextr = (cb->rindex + 1) % cb->size;  // next position to be read
 		  int result = cb->buffer[cb->rindex];
+		  if (clear) // clear on read...
+			  cb->buffer[cb->rindex] = 0;
 		  cb->rindex = nextr;
 		  balnew--;
 		  return result;
@@ -78,11 +94,12 @@
 
 
   //  Function to WRITE a char in the corresponding position
-  //	If the Cbuffer is FULL, doesnï¿½t write anything and returns -1
+  //	If the Cbuffer is FULL, doesn´t write anything and returns -1
   //	Otherwise, writes the char , updates the writing offset and returns 1
   int		Write(st_CB *cb, uint8_t x) {
     if (cb->hdma)
-	   cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
+	   //cb->wrindex = cb->size - cb->hdma->Instance->CNDTR;
+    	cb->wrindex = cb->size - cb->hdma->Instance->NDTR;
   	if (cb->rindex == (cb->wrindex + 1) % cb->size) {
   		cb->overruns++;
   		return -1;

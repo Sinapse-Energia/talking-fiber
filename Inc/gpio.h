@@ -63,21 +63,13 @@
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private defines */
-typedef enum {
-	RGB_COLOR_OFF = 0,
-	RGB_COLOR_WHITE,
-	RGB_COLOR_YELLOW,
-	RGB_COLOR_GREEN,
-	RGB_COLOR_RED,
-	RGB_COLOR_CYAN
-} RGB_Color_type;
+
 /* USER CODE END Private defines */
 
 void MX_GPIO_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-void RGB_Color_Set(RGB_Color_type color);
-void RGB_Color_Blink(RGB_Color_type color);
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

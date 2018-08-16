@@ -15,7 +15,8 @@
 #ifndef NBINTERFACE_H_
 #define NBINTERFACE_H_
 
-
+#include "Definitions.h"
+#include "circular.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,27 +31,77 @@ extern "C" {
 	char	*ProcessMessage	(char *message);
 
 	//		Helper functions for reading/writing variables forn C
-	char	*GetVariable	(char *name);
-	int		SetVariable		(char *name, char *value);
+	char	*GetVariable	(const char *name);
+	int		SetVariable		(const char *name, char *value);
 
+
+	// Actions called at pre or post-process
+	// Save & Restore Connection Params
 	int		SaveConnParams	(void);
 	int 	RecConnParams	(void);
+
+	// Save & Restore App Params
+	int		SaveAppParams	(void);
+	int 	RecAppParams	(void);
+
+	// Save & Restore BL Params
+	int		SaveBLParams	(void);
+	int 	RecBLParams	(void);
+
+	// Timer to execute everyday, at a certain moment
+	int 	DoAt			(Action, unsigned int , unsigned int , unsigned int);			//	function to set the new-day tasks
+
 	int		Flush			(void);
 
-	int		NEWCONN			(void);
-	int		REBOOT			(void);
+	int		SHORTNEWCONN		(void);
+	int		FULLNEWCONN			(void);
 
-	int 	SaveDevParamsToNVM(void);
+	//	C linkage call to the Scheduler
+	int		Schedule			(void);
 
-	void	*GetSubspaceElement(const char *prefix, const char *id);
-	unsigned int GetSubspaceElementsCount(const char* prefix);
-	const char *GetSubspaceElementByIndex(const char *prefix, unsigned int n);
+	// make publication, transport agnostic
+	int		Publish				(char *message);
+
+	// send message log transport agnostic
+	int		Log				(char *message);
+
+
+	void	*GetSubspaceElement	(const char *prefix, const char *id);
+
+
+	void	*MODEMFACTORY		(void *, st_CB *);
+	void	*ETHFACTORY			(void *, st_CB *);
+
+
+	int		BuildALL 				(void);
+	int		BuildINs 				(void);
+	int		BuildOUTs 				(void);
+
+#ifdef DEBUG
+	char	*Set_TimeOffset(const char *);
+	char	*Set_TimePoll(const char *);
+	char	*Set_TimePing(const char *);
+#endif
 
 
 #ifdef __cplusplus
 }
 #endif
 
+
+#ifdef __cplusplus
+#include "variant.h"
+
+extern	CVarint			*GetIntVar		(const char *name);
+extern	CVardec			*GetDecVar		(const char *name);
+extern	CVarstring		*GetStringVar	(const char *name);
+extern	CVartime		*GetTimeVar		(const char *name);
+extern	CVartuple		*GetTupleVar	(const char *name);
+extern	CVarlist		*GetListVar		(const char *name);
+
+
+
+#endif
 
 
 

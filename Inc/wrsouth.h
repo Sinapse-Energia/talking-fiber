@@ -29,6 +29,7 @@ extern const char	*GenericREAD(class CVariable *v);
 // Common facade for all WRITING  wrappers
 extern const char	*GenericWRITE(class CVariable *v, const char *val);
 
+extern  char        *Read_TFVOL(const char *value);
 
 extern	char		*Read_Temp(const char *);
 extern	char		*Read_I(const char *);
@@ -39,8 +40,5 @@ extern	char		*Read_S(const char *);
 extern	char		*Read_EP(const char *);
 extern	char		*Read_EQ(const char *);
 extern	char		*Read_ES(const char *);
-
-extern	char		*Write_DSTAT(const char *);
-
 
 #endif /* WRSOUTH_H_ */

@@ -26,16 +26,18 @@ class CVariable {
 
 		CVariable			*write		(const char *id, unsigned char options = 0);
 		char 				*read		(bool);
-		const char			*Name()		{return "??"; };
+		bool				Evaluate	();
+		const char			*Name()		{return name; };
 		const char			*Id()		{return nick; };
 		static CVariable	*get		(const char *id);
 //		static	char		*getAll		(void);
 		class CSubspace		*NS			() { return ns;};
-		CVariant			*Value		() { return value; };
+		CVariant			*Content	() { return value; };
+		unsigned int		units()		{ return value->units(); }
 
 		static void			Clean();
 	private:
-		//const char			*name;
+		const char			*name;
 		const char			*nick;
 		const char			*pref;		// pref del subspace
 		class CSubspace		*ns;
@@ -59,16 +61,16 @@ class CVariable {
 #define		KEY_SIZE			10
 
 // Maximum number of Subspace Elements			( EPDs)
-#define		MAX_TABLE_SIZE		600
+#define		MAX_TABLE_SIZE		5
 
 //	Maximum nuber of "Subspace context entries) ( EPD variables )
-#define		MAX_ITEMS			100
+#define		MAX_ITEMS			20
 
 // Maximum number of Subspaces					(EPDs in the only one so far)
 #define		MAX_SUBSPACES		5
 
 // Maximum size of each swaping cell
-#define		CELLSIZE			4096
+#define		CELLSIZE			512
 
 
 	typedef struct {
@@ -132,7 +134,7 @@ extern  int		GenericReadElement(unsigned int n, unsigned char *to);
 extern	int		GenericWriteElement(unsigned int n, unsigned char *to);
 
 
-extern	void	WriteData(char *p);
+extern	"C" void	WriteData(char *p);
 
 
 

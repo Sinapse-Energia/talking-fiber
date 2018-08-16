@@ -73,8 +73,6 @@ void MX_ADC1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
-float adc_read_val(uint32_t channel);
-
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
