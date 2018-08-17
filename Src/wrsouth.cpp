@@ -46,7 +46,16 @@ char	*VariableDec(double min, double max) {
 
 char *Read_TFVOL(const char *value)
 {
+  // Enable Photodiode power
+  HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_RESET);
+  HAL_Delay(100);
+
   float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6) * 1000;
+
+  // Disable Photodiode power
+  HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_SET);
 
   // Set timestamp
   char tsbuf[16];
