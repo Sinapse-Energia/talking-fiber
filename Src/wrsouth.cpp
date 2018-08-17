@@ -102,13 +102,19 @@ float randFloat(float min, float max)
 
 char *Read_TFVOL(const char *value)
 {
-	//HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_SET);
-	//HAL_Delay(100);
+    // Enable Photodiode power
+    HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_RESET);
+    HAL_Delay(100);
+
 	// Read ADC diode voltage
 	float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6) * 1000; // in mV
 	// PFM_TO_ANALOGUE = (VDD_PHOTODIODE/2)-R_23_1*Iphotodiode
 	//float Iphotodiode = (VDD_PHOTODIODE/2 - pfm_to_analogue) / R_23_1;
-	//HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_RESET);
+
+    // Disable Photodiode power
+    HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_SET);
 
 	// Set timestamp
 	char tsbuf[16];
