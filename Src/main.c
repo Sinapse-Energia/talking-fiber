@@ -213,6 +213,13 @@ int Reconnect(int *handle)
     return ntries;
 }
 
+void Disconnect()
+{
+    MqttDisconnect(hmqtt);
+    hmqtt = 0;
+    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
+}
+
 void OnDemandHander()
 {
     char inbuffer[256];
@@ -478,6 +485,10 @@ int main(void)
     lastTimeCorrectHour = atoi(getHour());
 #endif
 
+#if defined(CONNECT_ONLY_TO_SEND)
+    // Disconnect and disable M95
+    Disconnect();
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -579,12 +590,19 @@ int main(void)
                   sprintf(outtopic, "%s/%s",
                           GetVariable("MTPRT"),
                           GetVariable("DOPPT"));
+#if defined(CONNECT_ONLY_TO_SEND)
+                  Modem_preinit();
+                  Reconnect(&hmqtt);
+#endif
                   int rc = MqttPutMessage(hmqtt, outtopic, out);
                   if (rc < 1)
                   {
                       int n = Reconnect(&hmqtt);
                       tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
                   }
+#if defined(CONNECT_ONLY_TO_SEND)
+                  Disconnect();
+#endif
               }
           }
 #endif

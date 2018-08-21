@@ -95,6 +95,8 @@
 
  /* ========================= TF RELATED SETTINGS ========================== */
 
+//#define CONNECT_ONLY_TO_SEND
+
 // Enable periodic TF measurement and set default publish period in minutes
 #define ENABLE_PERIODIC
 #define DEFAULT_PERIOD  "1"
