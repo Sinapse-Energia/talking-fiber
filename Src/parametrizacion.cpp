@@ -201,6 +201,9 @@ int	 CreateContext() {
 		new CVariable ("PFM_TO_ANALOGUE voltage", 		"TFVOL",	new CVarstring  ("-1") ),
 		new CVariable ("PFM_TO_ANALOGUE timestamp", 	"TFVTS",	new CVarint     (0) ),
 		new CVariable ("PFM_TO_ANALOGUE_period",        "TFPER",    new CVarint     (DEFAULT_PERIOD) ),
+		new CVariable ("ALERT_period",                  "TFALM",    new CVarint     (DEFAULT_ALERT_M) ),
+		new CVariable ("ALERT_TH",                      "TFATH",    new CVarint     (DEFAULT_ALERT_TH) ),
+
 
 		NULL
 	};

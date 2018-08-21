@@ -17,6 +17,11 @@
 #define ENABLE_PERIODIC
 #define DEFAULT_PERIOD  1
 
+ // Enable alarm TF and set default period (minutes) and TH (mV)
+#define ENABLE_ALERT
+#define DEFAULT_ALERT_M 10
+#define DEFAULT_ALERT_TH 2700
+
 /* ========================================================================== */
 
 //#define BUILD_ALL_MODEMS

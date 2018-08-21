@@ -302,6 +302,30 @@ int	SendTF() {
 	hmqtt = 0;
 	HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
 #endif
+	return rc;
+}
+
+int SendTFAl() {
+#ifdef CONNECT_ONLY_TO_SEND
+    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
+    FULLNEWCONN();
+#endif
+
+    int rc = -1;
+    int mv = atoi(GetVariable("TFVOL"));
+    if (mv < atoi(GetVariable("TFATH")))
+    {
+        char out[64];
+        snprintf(out, 128, "L3_TF_ALERT;%s;%i;%s;",
+                GetVariable("ID"), mv, GetVariable("TFVTS"));
+        rc = Publish(out);
+    }
+
+#ifdef CONNECT_ONLY_TO_SEND
+    hmqtt = 0;
+    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
+#endif
+    return rc;
 }
 
 int SetTFPeriodic() {
@@ -310,6 +334,12 @@ int SetTFPeriodic() {
 	        60*atoi(GetVariable("TFPER")), SendTF);
 	int dx = CTimeEvent::Clear("TFP");
 	CTimeEvent::Add(timer);
+#endif
+#ifdef ENABLE_ALERT
+    CTimeEvent *timer2 = new CTimeEvent("TFA", GetTimeStamp(), 1 , -1,
+            60*atoi(GetVariable("TFALM")), SendTFAl);
+    int dx2 = CTimeEvent::Clear("TFA");
+    CTimeEvent::Add(timer2);
 #endif
 }
 
