@@ -297,8 +297,11 @@ int	SendTF() {
 }
 
 int SetTFPeriodic() {
-	CTimeEvent *timer = new CTimeEvent("TFP", GetTimeStamp(), 1 , -1, 60, SendTF);
+#ifdef ENABLE_PERIODIC
+	CTimeEvent *timer = new CTimeEvent("TFP", GetTimeStamp(), 1 , -1,
+	        60*atoi(GetVariable("TFPER")), SendTF);
 	int dx = CTimeEvent::Clear("TFP");
 	CTimeEvent::Add(timer);
+#endif
 }
 

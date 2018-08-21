@@ -9,6 +9,14 @@
 #define	DEFAULTBOARD	TalkingFiberBoard
 
 
+/* ========================= TF RELATED SETTINGS ============================ */
+
+// Enable periodic TF measurement and set default publish period in minutes
+#define ENABLE_PERIODIC
+#define DEFAULT_PERIOD  1
+
+/* ========================================================================== */
+
 //#define BUILD_ALL_MODEMS
 #define BUILD_M95
 //#define BUILD_BG96

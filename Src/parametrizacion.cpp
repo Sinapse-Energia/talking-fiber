@@ -200,6 +200,7 @@ int	 CreateContext() {
 		// Photodiode parameters
 		new CVariable ("PFM_TO_ANALOGUE voltage", 		"TFVOL",	new CVarstring  ("-1") ),
 		new CVariable ("PFM_TO_ANALOGUE timestamp", 	"TFVTS",	new CVarint     (0) ),
+		new CVariable ("PFM_TO_ANALOGUE_period",        "TFPER",    new CVarint     (DEFAULT_PERIOD) ),
 
 		NULL
 	};
