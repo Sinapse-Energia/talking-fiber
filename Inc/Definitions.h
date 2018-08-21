@@ -101,6 +101,8 @@
 #define ENABLE_PERIODIC
 #define DEFAULT_PERIOD  "1"
 
+//#define USE_SD_CARD
+
 /* ========================================================================== */
 
 #ifdef __cplusplus

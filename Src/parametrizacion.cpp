@@ -15,7 +15,9 @@
 #include	"Shared.h"
 #include    "MQTTAPI.H"
 
+#ifdef USE_SD_CARD
 #include    "fatfs.h"
+#endif
 
 #include	"stm32f2xx_hal.h"
 #include	"gpio.h"
@@ -129,6 +131,7 @@ static char devParamsBuf[DEV_PARAMS_BUF_SIZE];
 
 char* UnpackDevVariable(const char* name, char* buf, size_t len);
 
+#ifdef USE_SD_CARD
 static void SDCardErrorHandler()
 {
 	// Blink for 30 sec, than reboot
@@ -271,12 +274,13 @@ static size_t SDCardReadDataFile(const char* dname, void* data, size_t sz)
 
 	return (size_t)bytesread;
 }
-
+#endif
 //		This is the PROVISIONAL way of populating the Context :
 //		Declare an static array of pointers to CVariable objects
 //			and then, assign it to the static member
 int	 CreateContext()
 {
+#ifdef USE_SD_CARD
 	/* Start the SD Driver */
 	SDCardStart();
 
@@ -285,6 +289,7 @@ int	 CreateContext()
 //	static uint8_t buffer[_MAX_SS]; /* a work buffer for the f_mkfs() */
 //	res = f_mkfs((TCHAR const*)SDPath, FM_ANY, 0, buffer, sizeof(buffer));
 //	if(res != FR_OK) ContextErrorHandler();
+#endif
 
 	SharedMemoryData sharedData;
 	ReadSharedMemory(&sharedData);
@@ -292,8 +297,12 @@ int	 CreateContext()
     static CVariable *ALLVARS[DEVICE_PARAMS_CNT+1];
     ALLVARS[DEVICE_PARAMS_CNT] = NULL;
 
+#ifdef USE_SD_CARD
     // Read device parameters from NVM
     size_t bytesread = SDCardReadDataFile("DEV", devParamsBuf, DEV_PARAMS_BUF_SIZE);
+#else
+    size_t bytesread = 0;
+#endif
 
 	for (size_t i = 0; i < DEVICE_PARAMS_CNT; i++)
 	{
@@ -500,8 +509,10 @@ int SaveDevParamsToNVM(void)
 	}
 	bias++; // Include trailing '\0' in buffer length
 
+#ifdef USE_SD_CARD
 	// Save device context to memory
 	if (!SDCardWriteDataFile("DEV", devParamsBuf, bias)) return 0;
+#endif
 
 #ifdef DISP_TIMING
 	uint32_t endTick = HAL_GetTick();
