@@ -93,6 +93,12 @@
 // Use RTC for time operations
 #define TIME_WITH_RTC
 
+ /* ========================= TF RELATED SETTINGS ========================== */
+
+// Enable periodic TF measurement and set default publish period in minutes
+#define ENABLE_PERIODIC
+#define DEFAULT_PERIOD  "1"
+
 /* ========================================================================== */
 
 #ifdef __cplusplus

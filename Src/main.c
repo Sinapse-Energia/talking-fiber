@@ -171,6 +171,29 @@ int NEWCONN()
     return 1;
 }
 
+void Modem_preinit()
+{
+    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
+
+    HAL_UART_DMAStop(&HUART_GPRS);
+
+    int rc;
+    int n = 0;
+    do {
+        rc = Modem_Init();
+        n++;
+    } while (rc != M95_OK);
+    modem_init = 1;
+
+    int tries = 0;
+    HAL_StatusTypeDef rc2;
+    do {
+        rc2 = HAL_UART_Receive_DMA(&HUART_GPRS, DataBuffer->buffer, DataBuffer->size); // starts DMA reception
+        HAL_Delay(200);
+        tries++;
+    } while  (rc2 != HAL_OK);
+}
+
 int Reconnect(int *handle)
 {
     if (*handle > 0) MqttDisconnect(*handle);
@@ -405,9 +428,6 @@ int main(void)
 
   RGB_Color_Set(RGB_COLOR_YELLOW);
 
-  // TODO set in GPRS init
-  HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
-
   HAL_TIM_Base_Start_IT(&htim7); //Activate IRQ for Timer7
 
   HAL_Delay(30);
@@ -420,24 +440,7 @@ int main(void)
 
 #ifdef COMMUNICATION_M95
 	DataBuffer = CircularBuffer (256, &hdma_usart6_rx);
-	MX_DMA_Init();
-	HAL_UART_DMAStop(&HUART_GPRS);
-
-	int rc;
-	int n = 0;
-	do {
-		rc = Modem_Init();
-		n++;
-	} while (rc != M95_OK);
-	modem_init = 1;
-
-	int tries = 0;
-	HAL_StatusTypeDef rc2;
-	do {
-		rc2 = HAL_UART_Receive_DMA(&HUART_GPRS, DataBuffer->buffer, DataBuffer->size); // starts DMA reception
-		HAL_Delay(200);
-		tries++;
-	} while  (rc2 != HAL_OK);
+	Modem_preinit();
 #endif
 
     // Initialize context and connect
@@ -564,24 +567,27 @@ int main(void)
 
           SaveDevParamsToNVM();
 
-          // TODO if nowMinute % PERIOD
-
-          char *out = ProcessMessage("L3_TF_STATUS_OD;");
-          // put out into send buffer
-          if ((uint32_t)out != 0)
+#if defined(ENABLE_PERIODIC)
+          if (nowMinute % atoi(GetVariable("TFPER")) == 0)
           {
-              char outtopic[64];
-              // Topic to publish answer
-              sprintf(outtopic, "%s/%s",
-                      GetVariable("MTPRT"),
-                      GetVariable("DOPPT"));
-              int rc = MqttPutMessage(hmqtt, outtopic, out);
-              if (rc < 1)
+              char *out = ProcessMessage("L3_TF_STATUS_OD;");
+              // put out into send buffer
+              if ((uint32_t)out != 0)
               {
-                  int n = Reconnect(&hmqtt);
-                  tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
+                  char outtopic[64];
+                  // Topic to publish answer
+                  sprintf(outtopic, "%s/%s",
+                          GetVariable("MTPRT"),
+                          GetVariable("DOPPT"));
+                  int rc = MqttPutMessage(hmqtt, outtopic, out);
+                  if (rc < 1)
+                  {
+                      int n = Reconnect(&hmqtt);
+                      tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
+                  }
               }
           }
+#endif
       }
 
 #if defined(TIME_CORRECT_PERIODICALLY)
