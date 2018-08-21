@@ -9,8 +9,6 @@
 #include "usart.h"
 #include "iwdg.h"
 #include "gpio.h"
-#include "threadSafeWrappers.h"
-
 #include "Cmdflows.h"
 #include "circular.h"
 #include "utils.h"
@@ -263,8 +261,8 @@ int transport_update_tz(void)
 		if (handle < 0) continue;
 
 		// Get lat and lon
-		char* lat = GetVariableThreadSafe("GPSLAT");
-		char* lon = GetVariableThreadSafe("GPSLON");
+		char* lat = GetVariable("GPSLAT");
+		char* lon = GetVariable("GPSLON");
 
 		// Send request
 		sprintf(buf, "GET /v2/get-time-zone?key=%s&format=json&by=position&lat=%s&lng=%s HTTP/1.1\r\nHost: %s\r\n\r\n",
@@ -293,7 +291,7 @@ int transport_update_tz(void)
 		if (!wlan_parse_tz_json(json, &offset)) continue;
 		sprintf(buf, "%i", (offset/3600));
 
-		SetVariableThreadSafe("UTCOF", buf);
+		SetVariable("UTCOF", buf);
 
 		return 0;
 	}

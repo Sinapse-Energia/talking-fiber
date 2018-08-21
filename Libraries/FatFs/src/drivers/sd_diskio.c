@@ -1,25 +1,14 @@
-/*-----------------------------------------------------------------------*/
-/* Low level disk I/O module skeleton for FatFs     (C)ChaN, 2014        */
-/*                                                                       */
-/*   Portions COPYRIGHT 2017 STMicroelectronics                          */
-/*   Portions Copyright (C) 2014, ChaN, all right reserved               */
-/*-----------------------------------------------------------------------*/
-/* If a working storage control module is available, it should be        */
-/* attached to the FatFs via a glue function rather than modifying it.   */
-/* This is an example of glue functions to attach various exsisting      */
-/* storage control modules to the FatFs module with a defined API.       */
-/*-----------------------------------------------------------------------*/
-
 /**
   ******************************************************************************
-  * @file    diskio.c 
+  * @file    sd_diskio.c
   * @author  MCD Application Team
   * @version V1.4.1
   * @date    14-February-2017
-  * @brief   FatFs low level disk I/O module.
+  * @brief   SD Disk I/O driver
   ******************************************************************************
   * @attention
   *
+  * <h2><center>&copy; COPYRIGHT 2017 STMicroelectronics</center></h2>
   *
   * Redistribution and use in source and binary forms, with or without 
   * modification, are permitted, provided that the following conditions are met:
@@ -53,128 +42,192 @@
   * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
   ******************************************************************************
-  */
+  */ 
 
 /* Includes ------------------------------------------------------------------*/
-#include "diskio.h"
+#include <string.h>
 #include "ff_gen_drv.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-extern Disk_drvTypeDef  disk;
+/* Disk status */
+static volatile DSTATUS Stat = STA_NOINIT;
 
 /* Private function prototypes -----------------------------------------------*/
+DSTATUS SD_initialize (BYTE);
+DSTATUS SD_status (BYTE);
+DRESULT SD_read (BYTE, BYTE*, DWORD, UINT);
+#if _USE_WRITE == 1
+  DRESULT SD_write (BYTE, const BYTE*, DWORD, UINT);
+#endif /* _USE_WRITE == 1 */
+#if _USE_IOCTL == 1
+  DRESULT SD_ioctl (BYTE, BYTE, void*);
+#endif  /* _USE_IOCTL == 1 */
+  
+const Diskio_drvTypeDef  SD_Driver =
+{
+  SD_initialize,
+  SD_status,
+  SD_read, 
+#if  _USE_WRITE == 1
+  SD_write,
+#endif /* _USE_WRITE == 1 */
+  
+#if  _USE_IOCTL == 1
+  SD_ioctl,
+#endif /* _USE_IOCTL == 1 */
+};
+
 /* Private functions ---------------------------------------------------------*/
 
 /**
-  * @brief  Gets Disk Status 
-  * @param  pdrv: Physical drive number (0..)
-  * @retval DSTATUS: Operation status
-  */
-DSTATUS disk_status (
-	BYTE pdrv		/* Physical drive nmuber to identify the drive */
-)
-{
-  DSTATUS stat;
-  
-  stat = disk.drv[pdrv]->disk_status(disk.lun[pdrv]);
-  return stat;
-}
-
-/**
   * @brief  Initializes a Drive
-  * @param  pdrv: Physical drive number (0..)
+  * @param  lun : not used 
   * @retval DSTATUS: Operation status
   */
-DSTATUS disk_initialize (
-	BYTE pdrv				/* Physical drive nmuber to identify the drive */
-)
+DSTATUS SD_initialize(BYTE lun)
 {
-  DSTATUS stat = RES_OK;
+  Stat = STA_NOINIT;
   
-  if(disk.is_initialized[pdrv] == 0)
-  { 
-    disk.is_initialized[pdrv] = 1;
-    stat = disk.drv[pdrv]->disk_initialize(disk.lun[pdrv]);
+  /* Configure the uSD device */
+  if(BSP_SD_Init() == MSD_OK)
+  {
+    Stat &= ~STA_NOINIT;
   }
-  return stat;
+
+  return Stat;
 }
 
 /**
-  * @brief  Reads Sector(s) 
-  * @param  pdrv: Physical drive number (0..)
+  * @brief  Gets Disk Status
+  * @param  lun : not used
+  * @retval DSTATUS: Operation status
+  */
+DSTATUS SD_status(BYTE lun)
+{
+  Stat = STA_NOINIT;
+
+  if(BSP_SD_GetCardState() == MSD_OK)
+  {
+    Stat &= ~STA_NOINIT;
+  }
+  
+  return Stat;
+}
+
+/**
+  * @brief  Reads Sector(s)
+  * @param  lun : not used
   * @param  *buff: Data buffer to store read data
   * @param  sector: Sector address (LBA)
   * @param  count: Number of sectors to read (1..128)
   * @retval DRESULT: Operation result
   */
-DRESULT disk_read (
-	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
-	BYTE *buff,		/* Data buffer to store read data */
-	DWORD sector,	        /* Sector address in LBA */
-	UINT count		/* Number of sectors to read */
-)
+DRESULT SD_read(BYTE lun, BYTE *buff, DWORD sector, UINT count)
 {
-  DRESULT res;
- 
-  res = disk.drv[pdrv]->disk_read(disk.lun[pdrv], buff, sector, count);
+  DRESULT res = RES_ERROR;
+  uint32_t timeout = 100000;
+
+  if(BSP_SD_ReadBlocks((uint32_t*)buff, 
+                       (uint32_t) (sector), 
+                       count, SD_DATATIMEOUT) == MSD_OK)
+  {
+    while(BSP_SD_GetCardState()!= MSD_OK)
+    {
+      if (timeout-- == 0)
+      {
+        return RES_ERROR;
+      }
+    }
+    res = RES_OK;
+  }
+  
   return res;
 }
 
 /**
-  * @brief  Writes Sector(s)  
-  * @param  pdrv: Physical drive number (0..)
+  * @brief  Writes Sector(s)
+  * @param  lun : not used
   * @param  *buff: Data to be written
   * @param  sector: Sector address (LBA)
   * @param  count: Number of sectors to write (1..128)
   * @retval DRESULT: Operation result
   */
 #if _USE_WRITE == 1
-DRESULT disk_write (
-	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
-	const BYTE *buff,	/* Data to be written */
-	DWORD sector,		/* Sector address in LBA */
-	UINT count        	/* Number of sectors to write */
-)
+DRESULT SD_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
 {
-  DRESULT res;
+  DRESULT res = RES_ERROR;
+  uint32_t timeout = 100000;
+
+  if(BSP_SD_WriteBlocks((uint32_t*)buff, 
+                        (uint32_t)(sector), 
+                        count, SD_DATATIMEOUT) == MSD_OK)
+  {
+    while(BSP_SD_GetCardState()!= MSD_OK)
+    {
+      if (timeout-- == 0)
+      {
+        return RES_ERROR;
+      }
+    }    
+    res = RES_OK;
+  }
   
-  res = disk.drv[pdrv]->disk_write(disk.lun[pdrv], buff, sector, count);
   return res;
 }
 #endif /* _USE_WRITE == 1 */
 
 /**
-  * @brief  I/O control operation  
-  * @param  pdrv: Physical drive number (0..)
+  * @brief  I/O control operation
+  * @param  lun : not used
   * @param  cmd: Control code
   * @param  *buff: Buffer to send/receive control data
   * @retval DRESULT: Operation result
   */
 #if _USE_IOCTL == 1
-DRESULT disk_ioctl (
-	BYTE pdrv,		/* Physical drive nmuber (0..) */
-	BYTE cmd,		/* Control code */
-	void *buff		/* Buffer to send/receive control data */
-)
+DRESULT SD_ioctl(BYTE lun, BYTE cmd, void *buff)
 {
-  DRESULT res;
-
-  res = disk.drv[pdrv]->disk_ioctl(disk.lun[pdrv], cmd, buff);
+  DRESULT res = RES_ERROR;
+  BSP_SD_CardInfo CardInfo;
+  
+  if (Stat & STA_NOINIT) return RES_NOTRDY;
+  
+  switch (cmd)
+  {
+  /* Make sure that no pending write process */
+  case CTRL_SYNC :
+    res = RES_OK;
+    break;
+  
+  /* Get number of sectors on the disk (DWORD) */
+  case GET_SECTOR_COUNT :
+    BSP_SD_GetCardInfo(&CardInfo);
+    *(DWORD*)buff = CardInfo.LogBlockNbr;
+    res = RES_OK;
+    break;
+  
+  /* Get R/W sector size (WORD) */
+  case GET_SECTOR_SIZE :
+    BSP_SD_GetCardInfo(&CardInfo);
+    *(WORD*)buff = CardInfo.LogBlockSize;
+    res = RES_OK;
+    break;
+  
+  /* Get erase block size in unit of sector (DWORD) */
+  case GET_BLOCK_SIZE :
+    BSP_SD_GetCardInfo(&CardInfo);
+    *(DWORD*)buff = CardInfo.LogBlockSize;
+    res = RES_OK;
+    break;
+  
+  default:
+    res = RES_PARERR;
+  }
+  
   return res;
 }
 #endif /* _USE_IOCTL == 1 */
-
-/**
-  * @brief  Gets Time from RTC 
-  * @param  None
-  * @retval Time in DWORD
-  */
-__weak DWORD get_fattime (void)
-{
-  return 0;
-}
-
+  
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 

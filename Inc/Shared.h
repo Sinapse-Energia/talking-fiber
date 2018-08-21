@@ -12,6 +12,10 @@
 #include <stdbool.h>
 #include "Definitions.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define UPDFW_UNSET 			-1
 
 typedef enum {
@@ -48,5 +52,9 @@ bool ReadSharedMemory(SharedMemoryData* outData);
 bool WriteSharedMemory(SharedMemoryData* inData);
 
 bool UpdateSharedClientConnected(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* SHARED_H_ */

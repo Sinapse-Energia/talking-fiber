@@ -9,13 +9,11 @@
 
 #include "iwdg.h"
 #include "usart.h"
-#include "cmsis_os.h"
 
 #include "wlan.h"
 
 #include "gpio.h"
 
-#include "threadSafeWrappers.h"
 
 #if defined(SELECT_COMM_WLAN) || defined(HYBRID_M95_WLAN_CODE)
 
@@ -88,7 +86,7 @@ int transport_getdataMqttCtrl(unsigned char* buf, int count)
 	while ((wlanGetAvailableDataMqttCtrl() < count) &&
 			(wlanRxWaitTime < WLAN_RX_TIMEO))
 	{
-		osDelay(50);
+		HAL_Delay(50);
 		wlanRxWaitTime += 50;
 	}
 
@@ -155,7 +153,7 @@ int transport_getdataMqttPub(unsigned char* buf, int count)
 	while ((wlanGetAvailableDataMqttPub() < count) &&
 			(wlanRxWaitTime < WLAN_RX_TIMEO))
 	{
-		osDelay(50);
+		HAL_Delay(50);
 		wlanRxWaitTime += 50;
 	}
 

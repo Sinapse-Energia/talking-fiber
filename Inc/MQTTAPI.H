@@ -1,6 +1,10 @@
 #ifndef MQTTAPI_H_
 #define MQTTAPI_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern	int		MqttConnect		(const char	*host, unsigned int port, char *username, char *password);
 
 extern	int		MqttSubscribe	(int handle, char *topic);
@@ -26,6 +30,9 @@ extern	char	topictr[];
 extern	char	topicmqdebug[];
 extern	char	topicrfdebug[];
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

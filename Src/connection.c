@@ -8,9 +8,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "NBinterface.h"
-#include "threadSafeWrappers.h"
 #include "Definitions.h"
 #include "main.h"
 #include "MQTTAPI.H"
@@ -40,13 +40,13 @@ int	Connect(char *host, unsigned int port, char *user, char *password)
 			ok = true;
 
 			// Subscribe to AP actuation topic
-			sprintf(topic, "%s/CMC/ACT/%s", GetVariableThreadSafe("MTPRT"),
-					GetVariableThreadSafe("ID"));
+			sprintf(topic, "%s/CMC/ACT/%s", GetVariable("MTPRT"),
+					GetVariable("ID"));
 			if (MqttSubscribe(hconn, topic) < 0) ok = false;
 
 			// Subscribe to Global AP actuation topic
-			sprintf(topic, "%s/CMC/ACT/%s", GetVariableThreadSafe("MTPRT"),
-					GetVariableThreadSafe("DGRID"));
+			sprintf(topic, "%s/CMC/ACT/%s", GetVariable("MTPRT"),
+					GetVariable("DGRID"));
 			if (MqttSubscribe(hconn, topic) < 0) ok = false;
 
 			if (ok)
@@ -77,13 +77,13 @@ int	COMM_Init()
 	/// contextMutex must to be unlocked when call these function
 
 	int		hconn;
-	char	*id = GetVariableThreadSafe("ID");
+	char	*id = GetVariable("ID");
 
 	// Default broker parameters
-	char *h1 = GetVariableThreadSafe("MURI");
-	unsigned int p1 = atoi(GetVariableThreadSafe("MPORT"));
-	char *u1 = GetVariableThreadSafe("MUSER");
-	char *k1 = GetVariableThreadSafe("MPSWD");
+	char *h1 = GetVariable("MURI");
+	unsigned int p1 = atoi(GetVariable("MPORT"));
+	char *u1 = GetVariable("MUSER");
+	char *k1 = GetVariable("MPSWD");
 
  	hconn = Connect(h1, p1, u1, k1);
 	if (hconn > 0) {
@@ -100,10 +100,10 @@ int	COMM_Init()
 	}
 	else {
 		// CONTINGENCY: Try with the LAST SUCCESSFUL CONNECTION CONFIG VALUES
-		char *h2 = GetVariableThreadSafe("BMURI");
-		unsigned int p2 = atoi(GetVariableThreadSafe("BMPRT"));
-		char *u2 = GetVariableThreadSafe("BMUSR");
-		char *k2 = GetVariableThreadSafe("BMPSW");
+		char *h2 = GetVariable("BMURI");
+		unsigned int p2 = atoi(GetVariable("BMPRT"));
+		char *u2 = GetVariable("BMUSR");
+		char *k2 = GetVariable("BMPSW");
 	 	hconn = Connect(h2, p2, u2, k2);
 		if (hconn > 0) {
 			tprintf (hconn,

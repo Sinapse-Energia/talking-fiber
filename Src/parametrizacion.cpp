@@ -13,16 +13,12 @@
 #include	"wrsouth.h" 
 #include	"utils.h"
 #include	"Shared.h"
+#include    "MQTTAPI.H"
 
-#include    "ff_gen_drv.h"
-#include    "sd_diskio.h"
+#include    "fatfs.h"
 
-#include	"threadSafeWrappers.h"
 #include	"stm32f2xx_hal.h"
 #include	"gpio.h"
-
-FATFS SDFatFs;  /* File system object for SD card logical drive */
-char SDPath[4]; /* SD card logical drive path */
 
 extern int hmqtt;
 
@@ -142,7 +138,7 @@ static void SDCardErrorHandler()
 		HAL_Delay(250);
 	}
 
-	TraceThreadSafeFromContext(hmqtt, (char*)"SDCardError: Fatal error");
+	tprintf(hmqtt, (char*)"SDCardError: Fatal error");
 
 	NVIC_SystemReset();
 }
@@ -156,14 +152,14 @@ static void SDCardStart()
 
 	/*##-2- Register the file system object to the FatFs module ##############*/
 	/* If this fails - it is fatal error */
-	FRESULT res = f_mount(&SDFatFs, SDPath, 1);
+	FRESULT res = f_mount(&SDFatFS, SDPath, 1);
 	if(res != FR_OK)
 		SDCardErrorHandler();
 }
 
 static void SDCardRestart()
 {
-	TraceThreadSafeFromContext(hmqtt, (char*)"Restarting SD driver");
+    tprintf(hmqtt, (char*)"Restarting SD driver");
 
 	/*##-2- Unmount the file system object ###################################*/
 	/* If this fails - it is fatal error */
@@ -214,16 +210,15 @@ static bool SDCardWriteDataFile(const char* dname, const void* data, size_t sz)
 				res = f_write(&file, data, writesize, &byteswrite);
 				f_close(&file);
 				if (res != FR_OK || byteswrite != writesize)
-					TraceThreadSafeFromContext(hmqtt,
-						(char*)"SDCardWrite: %s write error %i, size %i",
-						name[i], (int)res, (int)byteswrite);
+				    tprintf(hmqtt,
+				            (char*)"SDCardWrite: %s write error %i, size %i",
+				            name[i], (int)res, (int)byteswrite);
 				else
 					done = true;
 			}
 			else
-				TraceThreadSafeFromContext(hmqtt,
-					(char*)"SDCardWrite: %s create error %i",
-					name[i], (int)res);
+			    tprintf(hmqtt, (char*)"SDCardWrite: %s create error %i",
+			            name[i], (int)res);
 
 			if (!done)
 			{
@@ -291,7 +286,7 @@ int	 CreateContext()
 //	if(res != FR_OK) ContextErrorHandler();
 
 	SharedMemoryData sharedData;
-	ReadSharedMemory_ThreadSafe(&sharedData);
+	ReadSharedMemory(&sharedData);
 
     static CVariable *ALLVARS[DEVICE_PARAMS_CNT+1];
     ALLVARS[DEVICE_PARAMS_CNT] = NULL;

@@ -16,12 +16,12 @@
 #include "utils.h"
 #include "NBinterface.h"
 #include "Frames.h"
-#include "threadSafeWrappers.h"
 #include "tim.h"
 #include "gpio.h"
 #include "usart.h"
 #include "Shared.h"
 #include "adc.h"
+#include "Shared.h"
 
 /************************************************
 			PROVISIONAL
@@ -279,7 +279,7 @@ int Post_STGPS()
 int Post_BTCFG()
 {
 	SharedMemoryData sharedData;
-	ReadSharedMemory_ThreadSafe(&sharedData);
+	ReadSharedMemory(&sharedData);
 
 	// TODO change string sizes from hardcoded to defined
 
@@ -315,7 +315,7 @@ int Post_BTCFG()
 	// Need to have specified pattern to check
 
 	// Write parameters
-	if (WriteSharedMemory_ThreadSafe(&sharedData))
+	if (WriteSharedMemory(&sharedData))
 		SetVariable((char*)"BTLRES", (char*)"0");
 	else
 		SetVariable((char*)"BTLRES", (char*)"5");
@@ -329,9 +329,9 @@ int Post_BTACT()
 
 	// Set UPDFW to 1
 	SharedMemoryData sharedData;
-	ReadSharedMemory_ThreadSafe(&sharedData);
+	ReadSharedMemory(&sharedData);
 	sharedData.variables.UPDFW = 1;
-	if (WriteSharedMemory_ThreadSafe(&sharedData))
+	if (WriteSharedMemory(&sharedData))
 		SetVariable((char*)"BTLRES", (char*)"0");
 	else
 		SetVariable((char*)"BTLRES", (char*)"5");

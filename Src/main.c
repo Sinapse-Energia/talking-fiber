@@ -49,12 +49,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f2xx_hal.h"
-#include "cmsis_os.h"
 #include "adc.h"
 #include "dma.h"
+#include "fatfs.h"
 #include "i2c.h"
 #include "iwdg.h"
 #include "rtc.h"
+#include "sdio.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -127,11 +128,28 @@ int modem_init = 0;
 
 #endif
 
+int hmqtt = 0;
+
+char topictr[128];
+
+#if defined(DEBUG_ENABLE_MQTT_QUEUE_PUB)
+char topicmqdebug[128];
+#endif
+
+int today = 0; // Current day, used for sunrise/sunset calculation
+int prevMinute = 0, prevHour = 0;
+#if defined(TIME_CORRECT_PERIODICALLY)
+int lastTimeCorrectHour = 0;
+#endif
+
+volatile bool rebootScheduled = false;
+volatile long rebootAtTimestamp = 0;
+volatile bool reconnectScheduled = false;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-void MX_FREERTOS_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -139,6 +157,204 @@ void MX_FREERTOS_Init(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
+
+int REBOOT()
+{
+    rebootAtTimestamp = GetTimeStamp() + 5; // restart in 5 seconds
+    rebootScheduled = true;
+    return 1;
+}
+
+int NEWCONN()
+{
+    reconnectScheduled = true;
+    return 1;
+}
+
+int Reconnect(int *handle)
+{
+    if (*handle > 0) MqttDisconnect(*handle);
+    int ntries = 0;
+    do {
+        *handle = COMM_Init();
+        ntries++;
+    } while (*handle <= 0);
+
+    if (!UpdateSharedClientConnected())
+    {
+#if defined(DEBUG)
+        tprintf(*handle, "Update shared memory failed!");
+#endif
+    }
+
+    return ntries;
+}
+
+void OnDemandHander()
+{
+    char inbuffer[256];
+    char intopic[64];
+    char outtopic[64];
+    char *mssg = NULL;
+    static int cnomssg = 0;
+
+    intopic[0] = '\0';
+
+    RGB_Color_Set(RGB_COLOR_OFF);
+
+    // Get message from queue
+    mssg = MqttGetMessage(hmqtt, inbuffer, 256, intopic, 256);
+
+    if (mssg)
+    {
+        // Message received and will be processed
+        RGB_Color_Set(RGB_COLOR_CYAN);
+
+        cnomssg = 0;
+        tprintf(hmqtt, "Incoming message #%s#:#%s#", intopic, mssg);
+
+        // Now Context API not checking the topics - do these outside engine
+
+        // By default publish to debug
+        sprintf(outtopic, "%s/CMC/DEBUG", GetVariable("MTPRT"));
+
+        if ((strlen(mssg) >= 4 && memcmp("204;", mssg, 4) == 0) ||
+                (strlen(mssg) >= 4 && memcmp("207;", mssg, 4) == 0) ||
+                (strlen(mssg) >= 4 && memcmp("208;", mssg, 4) == 0) ||
+                (strlen(mssg) >= 4 && memcmp("209;", mssg, 4) == 0))
+        {
+            sprintf(outtopic, "%s/CMC/CONFIG", GetVariable("MTPRT"));
+        }
+
+        // Process using context API
+        char *out = ProcessMessage(mssg);
+
+        if ((uint32_t)out != 0 && memcmp("999;", out, 4) == 0)
+        { // if Unknown command
+            if (strlen(mssg) >= 4 &&
+                memcmp("398;", mssg, 4) == 0)
+            { // Reboot command received
+                long minutes = 0;
+                if (strlen(mssg) > 4)
+                {
+                    char buf[16] = { 0 };
+                    // Copy minutes to buffer
+                    memcpy(buf, &mssg[4], (strlen(&mssg[4])-1));
+                    // Parse minutes
+                    sscanf(buf, "%li", &minutes);
+                }
+                // Calculate reboot timestamp
+                rebootAtTimestamp = GetTimeStamp() + minutes*60;
+
+                // Schedule reboot
+                rebootScheduled = true;
+
+                // No responce for the Reboot command
+                out = NULL;
+            }
+            else if (strlen(mssg) == 15 &&
+                memcmp("314;", mssg, 4) == 0 &&
+                memcmp(";12345678;", &mssg[5], 10) == 0)
+            { // Erase command received
+
+                // response for the Erase command
+                out = "714;TRUE;";
+
+                // Erase NVM
+                switch (mssg[4])
+                {
+                case '0':
+                {
+                    if(f_mkfs((TCHAR const*)SDPath, 0, 0) != FR_OK)
+                    {
+                        out = "714;FALSE;";
+                        RGB_Color_Set(RGB_COLOR_YELLOW);
+                    }
+                    break;
+                }
+                default:
+                    out = "714;WrongArgument;";
+                }
+
+                // Send response immediately
+                MqttPutMessage(hmqtt, outtopic, out);
+                MqttPutMessage(hmqtt, outtopic, out);
+
+                HAL_Delay(1000);
+
+                // Reboot device
+                NVIC_SystemReset();
+            }
+            else if (strlen(mssg) > 4 &&
+                memcmp("127;", mssg, 4) == 0)
+            { // Set time command
+
+                // Parse command parameters
+                int yr = -1, mo = -1, da = -1, hr = -1, mn = -1, sc = -1;
+                sscanf(mssg+4, "%d;%d;%d;%d;%d;%d;", &yr, &mo, &da,
+                        &hr, &mn, &sc);
+
+                // Check parameters
+                if (!(yr < 0 || mo < 1 || mo > 12 || da < 1 || da > 31 ||
+                        hr < 0 || hr > 23 || mn < 0 || mn > 59 ||
+                        sc < 0 || sc > 59))
+                {
+                    // Normalize year
+                    yr = yr % 100;
+
+                    // Set time
+                    char buf[32];
+                    sprintf(&buf[0], "  %d/%d/%d,%d:%d:%d", yr, mo, da, hr, mn, sc);
+                    SetDateTime(&buf[0]);
+
+                    // Set time changed flag
+                    SetVariable("TIMEFL", "1");
+                    SaveDevParamsToNVM();
+
+                    // No response for the command
+                    out = NULL;
+                }
+            }
+        }
+
+        // put out into send buffer
+        if ((uint32_t)out != 0)
+        {
+            int rc = MqttPutMessage(hmqtt, outtopic, out);
+            if (rc < 1)
+            {
+                int n = Reconnect(&hmqtt);
+                tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
+            }
+        }
+    }
+    else
+    {
+        cnomssg++;
+        if (cnomssg > 3)
+        {
+            // Send Ping request
+            int rc = MqttPing(hmqtt);
+
+            if (rc < 1)
+            {
+              //  It seems we are'nt receiving anymore
+              tprintf(hmqtt, "Sended Ping without getting PINGRESP (deafness?)");
+
+              // Reconnect
+              tprintf(hmqtt, "Ready  to reconnexion or reboot!!! ");
+              int ntries = Reconnect(&hmqtt);
+              tprintf(hmqtt, "Hearing recovered after %d tries!!", ntries);
+            }
+            else
+            {
+              tprintf(hmqtt, "Sended Ping getting %d", rc);
+            }
+
+            cnomssg = 0;
+        }
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -168,7 +384,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  HAL_Delay(1000);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -176,14 +392,15 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
+  MX_SDIO_SD_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_USART6_UART_Init();
   MX_RTC_Init();
-  MX_TIM6_Init();
   MX_TIM7_Init();
   MX_IWDG_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
   RGB_Color_Set(RGB_COLOR_YELLOW);
@@ -223,26 +440,170 @@ int main(void)
 	} while  (rc2 != HAL_OK);
 #endif
 
+    // Initialize context and connect
+
+    // Create the Variable's Context
+    CreateContext();
+
+    // Read the messages's metadata
+    ReadMetadata("", "");
+
+    // Initialize debug topic
+    sprintf (topictr, "%s/CMC/DEBUG", GetVariable("MTPRT"));
+
+#if defined(DEBUG_ENABLE_MQTT_QUEUE_PUB)
+    sprintf (topicmqdebug, "%s/%s/MQTT_DEBUG", GetVariable("MTPRT"), GetVariable("ID"));
+#endif
+
+#ifdef HYBRID_M95_WLAN_CODE
+    if (GetVariable("TIMEFL")[0] == '0')
+    {
+        transport_get_time();
+    }
+
+//    transport_update_tz();
+#endif
+
+    Reconnect(&hmqtt);
+
+#if defined(DEBUG_ENABLE_MQTT_QUEUE_PUB)
+    // Update debug topic - ID could be changed after connection (IMEI case)
+    sprintf (topicmqdebug, "%s/%s/MQTT_DEBUG", GetVariable("MTPRT"), GetVariable("ID"));
+#endif
+
+#if defined(TIME_CORRECT_PERIODICALLY)
+    lastTimeCorrectHour = atoi(getHour());
+#endif
+
   /* USER CODE END 2 */
-
-  /* Call init function for freertos objects (in freertos.c) */
-  MX_FREERTOS_Init();
-
-  /* Start scheduler */
-  osKernelStart();
-  
-  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      // One second granularity
+      HAL_Delay(1000);
+      HAL_IWDG_Refresh(&hiwdg);
 
+      // Blink once a second with green RGB if connected
+      if (hmqtt > 0) RGB_Color_Blink(RGB_COLOR_GREEN);
+
+//      OnDemandHander();
+
+      // Check for Reboot scheduled
+      if (rebootScheduled && (GetTimeStamp() >= rebootAtTimestamp))
+      {
+          SaveDevParamsToNVM();
+          tprintf(hmqtt, "Reboot!");
+          //rebootScheduled = false;
+          NVIC_SystemReset();
+      }
+
+      // Check for reconnect scheduled
+      if (reconnectScheduled)
+      {
+          SaveDevParamsToNVM();
+
+          char *host = GetVariable("MURI");
+          unsigned int port = atoi(GetVariable("MPORT"));
+
+          tprintf(hmqtt,
+              "Go to DISCONNECT from this server and connect to %s:%d.\nBye",
+                  host, port);
+
+          Reconnect(&hmqtt);
+
+          tprintf(hmqtt, "This has been a RECONNECTION!!!");
+
+          reconnectScheduled = false;
+      }
+
+      // Each minute perform scheduler tasks
+
+      // Get now hour and minute
+      int nowHour = atoi(getHour());
+      int nowMinute = atoi(getMinute());
+
+      if (nowHour != prevHour)
+      {
+          prevHour = nowHour;
+
+          // Sunrise/Sunset calculation once a day
+          int nowDay = 0, nowMonth = 0, nowYear = 0;
+          getDate(&nowDay, &nowMonth, &nowYear);
+          if (today != nowDay)
+          {
+              today = nowDay;
+
+              // Get coordinates
+              double lat = atof(GetVariable("GPSLAT"));
+              double lon = atof(GetVariable("GPSLON"));
+
+              // Calculate SR/SS
+              int srHour = 6, srMin = 0, ssHour = 21, ssMin = 0;
+              CalculateSunRiseSetTimes(lat, lon,
+                      nowYear, nowMonth, nowDay,
+                      &srHour, &srMin, &ssHour, &ssMin);
+
+              char buf[8];
+              // Set SR/SS variables
+              sprintf(buf, "%i", srHour);
+              SetVariable("GPSSRH", buf);
+              sprintf(buf, "%i", srMin);
+              SetVariable("GPSSRM", buf);
+              sprintf(buf, "%i", ssHour);
+              SetVariable("GPSSSH", buf);
+              sprintf(buf, "%i", ssMin);
+              SetVariable("GPSSSM", buf);
+          }
+      }
+
+      if (nowMinute != prevMinute)
+      {
+          prevMinute = nowMinute;
+
+          SaveDevParamsToNVM();
+
+          // TODO if nowMinute % PERIOD
+
+          char *out = ProcessMessage("L3_TF_STATUS_OD;");
+          // put out into send buffer
+          if ((uint32_t)out != 0)
+          {
+              char outtopic[64];
+              // Topic to publish answer
+              sprintf(outtopic, "%s/%s",
+                      GetVariable("MTPRT"),
+                      GetVariable("DOPPT"));
+              int rc = MqttPutMessage(hmqtt, outtopic, out);
+              if (rc < 1)
+              {
+                  int n = Reconnect(&hmqtt);
+                  tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
+              }
+          }
+      }
+
+#if defined(TIME_CORRECT_PERIODICALLY)
+      if (lastTimeCorrectHour != nowHour &&
+              (nowHour % TIME_CORRECT_PERIOD_HOURS) == 0)
+      {
+          lastTimeCorrectHour = nowHour;
+
+          if (GetVariable("TIMEFL")[0] == '0')
+          {
+              // Performing reboot because for time correcting we need to
+              // Disconnect from MQTT - connect to TIME - get time - disconnect from TIME - connect to MQTT
+              // And this is the same as reboot
+              REBOOT();
+          }
+      }
+#endif
+  }
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
 
-  }
   /* USER CODE END 3 */
 
 }
@@ -305,12 +666,10 @@ void SystemClock_Config(void)
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
 
   /* SysTick_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(SysTick_IRQn, 15, 0);
+  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
 /* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /**
   * @brief  Period elapsed callback in non blocking mode
@@ -322,13 +681,6 @@ void SystemClock_Config(void)
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  /* USER CODE BEGIN Callback 0 */
-
-  /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM1) {
-    HAL_IncTick();
-  }
-  /* USER CODE BEGIN Callback 1 */
   if (htim->Instance==TIM7)
   {
     AddSeconds(10);
@@ -340,8 +692,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       timeoutGPRS=1;
     }
   }
-  /* USER CODE END Callback 1 */
 }
+
+
+/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.

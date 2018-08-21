@@ -300,6 +300,7 @@ int		tprintf(int hcon, char *texto,...) {
 	char	  salida[512];
 
 	va_start	  (ap, texto);
+	if (hcon <= 0) return 0;
 //	sprintf (salida, "Node %s :", GetVariable("ID"));
 	sprintf (salida, "Node %s <%s> ", GetVariable("ID"), strDateTime());
 	vsprintf (salida+strlen(salida), texto, ap);
