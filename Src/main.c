@@ -610,6 +610,36 @@ int main(void)
               }
           }
 #endif
+#if defined(ENABLE_ALERT)
+          if (nowMinute % atoi(GetVariable("TFALM")) == 0)
+          {
+            int mv = atoi(GetVariable("TFVOL"));
+            if (mv < atoi(GetVariable("TFATH")))
+            {
+                char outtopic[64];
+                char out[64];
+                snprintf(out, 128, "L3_TF_ALERT;%s;%i;%s;",
+                        GetVariable("ID"), mv, GetVariable("TFVTS"));
+                // Topic to publish answer
+                sprintf(outtopic, "%s/%s",
+                        GetVariable("MTPRT"),
+                        GetVariable("DALPT"));
+#if defined(CONNECT_ONLY_TO_SEND)
+                Modem_preinit();
+                Reconnect(&hmqtt);
+#endif
+                int rc = MqttPutMessage(hmqtt, outtopic, out);
+                if (rc < 1)
+                {
+                    int n = Reconnect(&hmqtt);
+                    tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
+                }
+#if defined(CONNECT_ONLY_TO_SEND)
+                Disconnect();
+#endif
+            }
+        }
+#endif
       }
 
 #if defined(TIME_CORRECT_PERIODICALLY)
