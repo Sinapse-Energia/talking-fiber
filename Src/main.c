@@ -667,6 +667,11 @@ int main(void)
 
 			RecAppParams();
 
+#ifdef CONNECT_ONLY_TO_SEND
+			hmqtt = 0;
+			HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
+#endif
+
 			while (1) {
 				if (atoi(GetVariable("GPS")))
 					Color(COL_CONNECTEDGPS);
@@ -674,12 +679,15 @@ int main(void)
 					Color(COL_CONNECTED);
 
 				Blink();
+#ifndef CONNECT_ONLY_TO_SEND
 				if  (rc > 0) {
+#endif
 					char 	buffer[256];
 					char *mssg = NULL;
 					if (WDT_ENABLED==1) HAL_IWDG_Refresh(&hiwdg);
 //						tprintf (hmqtt, "Going to Poll for incoming commands...!!");
 
+#ifndef CONNECT_ONLY_TO_SEND
 						mssg = MqttGetMessage(hmqtt, buffer, 256);
 
 						if (mssg) {
@@ -703,7 +711,9 @@ int main(void)
 #ifdef DEBUG
 						//		tprintf (hmqtt, "No mssg in queue");
 #endif
+#endif
 								Schedule();
+#ifndef CONNECT_ONLY_TO_SEND
 								if (GetTimeStamp() - lastget > timeping){
 									lastget = GetTimeStamp();
 //									tprintf (hmqtt, "BEFORE sending Ping...!!");
@@ -758,7 +768,7 @@ int main(void)
 			    	  tprintf (hmqtt, "RECONNECTED because of communication breakdown!!!!");
 #endif
 			      }
-
+#endif
 			 }
 
   /* USER CODE END WHILE */

@@ -293,7 +293,15 @@ int EvalSunTimes() {
 }
 
 int	SendTF() {
-	return SendFrame("L3TFR");
+#ifdef CONNECT_ONLY_TO_SEND
+    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
+    FULLNEWCONN();
+#endif
+	int rc = SendFrame("L3TFR");
+#ifdef CONNECT_ONLY_TO_SEND
+	hmqtt = 0;
+	HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
+#endif
 }
 
 int SetTFPeriodic() {
