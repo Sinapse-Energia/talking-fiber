@@ -506,7 +506,7 @@ int main(void)
       // Blink once a second with green RGB if connected
       if (hmqtt > 0) RGB_Color_Blink(RGB_COLOR_GREEN);
 
-//      OnDemandHander();
+      OnDemandHander();
 
       // Check for Reboot scheduled
       if (rebootScheduled && (GetTimeStamp() >= rebootAtTimestamp))
