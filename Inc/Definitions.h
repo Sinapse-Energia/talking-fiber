@@ -97,6 +97,10 @@
 
 //#define CONNECT_ONLY_TO_SEND
 
+// When this workaround is used, period of periodic (if enabled) and alerts
+// will be the same: lesser of two DEFAULT_PERIOD and DEFAULT_ALERT_M
+//#define CONNECT_ONLY_TO_SEND_WORKAROUND
+
 // Enable periodic TF measurement and set default publish period in minutes
 #define ENABLE_PERIODIC
 #define DEFAULT_PERIOD  "1"
