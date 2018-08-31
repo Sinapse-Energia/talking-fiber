@@ -95,7 +95,7 @@
 
  /* ========================= TF RELATED SETTINGS ========================== */
 
-//#define CONNECT_ONLY_TO_SEND
+#define CONNECT_ONLY_TO_SEND
 
 // When this workaround is used, period of periodic (if enabled) and alerts
 // will be the same: lesser of two DEFAULT_PERIOD and DEFAULT_ALERT_M
@@ -103,7 +103,7 @@
 
 // Enable periodic TF measurement and set default publish period in minutes
 #define ENABLE_PERIODIC
-#define DEFAULT_PERIOD  "1"
+#define DEFAULT_PERIOD  "5"
 
 //#define USE_SD_CARD
 

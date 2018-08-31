@@ -173,7 +173,8 @@ int NEWCONN()
 
 void Modem_preinit()
 {
-    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
+//    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
+//    HAL_Delay(1000);
 
     HAL_UART_DMAStop(&HUART_GPRS);
 
@@ -219,7 +220,9 @@ void Disconnect()
     MqttDisconnect(hmqtt);
 #endif
     hmqtt = 0;
-    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
+    static const char pwroffCmd[] = "AT+QPOWD=1\r";
+    HAL_UART_Transmit(&HUART_GPRS, (uint8_t*)pwroffCmd, strlen(pwroffCmd), 1000);
+//    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
 }
 
 void OnDemandHander()
@@ -402,6 +405,7 @@ void ExecPeriodic(void)
 	#if defined(CONNECT_ONLY_TO_SEND)
 		Modem_preinit();
 		Reconnect(&hmqtt);
+		tprintf(hmqtt, "Connected!");
 	#endif
 		int rc = MqttPutMessage(hmqtt, outtopic, out);
 		if (rc < 1)
@@ -410,6 +414,7 @@ void ExecPeriodic(void)
 			tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
 		}
 	#if defined(CONNECT_ONLY_TO_SEND)
+		tprintf(hmqtt, "Disconnecting!");
 		Disconnect();
 	#endif
 	}
@@ -428,6 +433,7 @@ void ExecAlert(int mv)
 #if defined(CONNECT_ONLY_TO_SEND)
 	Modem_preinit();
 	Reconnect(&hmqtt);
+	tprintf(hmqtt, "Connected!");
 #endif
 	int rc = MqttPutMessage(hmqtt, outtopic, out);
 	if (rc < 1)
@@ -436,6 +442,7 @@ void ExecAlert(int mv)
 		tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
 	}
 #if defined(CONNECT_ONLY_TO_SEND)
+	tprintf(hmqtt, "Disconnecting!");
 	Disconnect();
 #endif
 }
@@ -505,6 +512,7 @@ int main(void)
 
 #ifdef COMMUNICATION_M95
 	DataBuffer = CircularBuffer (256, &hdma_usart6_rx);
+    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_SET);
 	Modem_preinit();
 #endif
 
@@ -572,6 +580,11 @@ int main(void)
 
       // Blink once a second with green RGB if connected
       if (hmqtt > 0) RGB_Color_Blink(RGB_COLOR_GREEN);
+
+      if (HAL_GPIO_ReadPin(M95_STATUS_GPIO_Port, M95_STATUS_Pin) == GPIO_PIN_SET)
+    	  RGB_Color_Set(RGB_COLOR_CYAN);
+      else
+    	  RGB_Color_Set(RGB_COLOR_OFF);
 
 #if !defined(CONNECT_ONLY_TO_SEND) && !defined(CONNECT_ONLY_TO_SEND_WORKAROUND)
       OnDemandHander();

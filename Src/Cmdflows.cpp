@@ -52,6 +52,7 @@ M95Status	M95_Initialize(
 
 	HAL_GPIO_WritePin(ctrlEmerg_PORT, ctrlEmerg_PIN, GPIO_PIN_SET); // This has changed because of OD
 	HAL_Delay(3000);
+	HAL_GPIO_WritePin(ctrlPwrkey_PORT, ctrlPwrkey_PIN, GPIO_PIN_SET);
 
 
 	if (WDT_ENABLED == 1) HAL_IWDG_Refresh(hiwdg);
