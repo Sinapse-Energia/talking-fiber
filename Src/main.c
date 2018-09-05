@@ -447,6 +447,29 @@ void ExecAlert(int mv)
 #endif
 }
 
+/**
+ * @brief Initiate MCU sleep/standby and wake it up in sec period
+ */
+void Sleep_Delay(uint32_t sec)
+{
+	if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, sec, RTC_WAKEUPCLOCK_CK_SPRE_16BITS) != HAL_OK)
+	  {
+	    _Error_Handler(__FILE__, __LINE__);
+	  }
+#if defined(USE_SLEEPMODE)
+	HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFE);// WFE, cause WKUPTimer is event
+#endif
+
+#if defined(USE_STOPMODE)
+	HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+#endif
+
+#if defined(USE_STANDBY)
+	HAL_PWR_EnterSTANDBYMode();
+#endif
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -476,6 +499,8 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
   HAL_Delay(1000);
+  /* Enable Power Clock */
+  __HAL_RCC_PWR_CLK_ENABLE();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -574,12 +599,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      // One second granularity
-      HAL_Delay(1000);
+      // Five second granularity
+      Sleep_Delay(5);
+
       HAL_IWDG_Refresh(&hiwdg);
 
       // Blink once a second with green RGB if connected
-      if (hmqtt > 0) RGB_Color_Blink(RGB_COLOR_GREEN);
+      /*if (hmqtt > 0)*/ RGB_Color_Blink(RGB_COLOR_GREEN);
 
       if (HAL_GPIO_ReadPin(M95_STATUS_GPIO_Port, M95_STATUS_Pin) == GPIO_PIN_SET)
     	  RGB_Color_Set(RGB_COLOR_CYAN);

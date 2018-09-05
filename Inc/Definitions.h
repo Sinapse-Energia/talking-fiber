@@ -18,6 +18,8 @@
 #define VDD_PHOTODIODE	5.0f
 #define R_23_1			120000l 					//120KOm
 
+#define USE_STOPMODE
+
 #define SIZE_APN 60
 #define SIZE_MAIN_SERVER 60
 #define SIZE_NTP_SERVER 60
