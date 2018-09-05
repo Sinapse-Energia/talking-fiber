@@ -119,6 +119,24 @@ CmdProps	*M95ConnectFlow(
 			{	ATGET,		"",		{"AT+QCCID\r"}, 	{NULL, NULL ,SetIdSIM}, 	{1000, 0}, 	1} ,
 			{	ATGET,		"",		{"AT+GSN\r"}, 		{NULL, NULL ,SetIMEI}, 		{1000, 0}, 	1} ,
 //			{	ATGET,		"",		{"AT+QGSN\r"}, 		{NULL, NULL ,SetIMEI}, 		{1000, 0}, 	1} ,
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+			//disable power voltage warning
+			{	ATMATCH,	"",		{"AT+QVBATT=0,3500,0\r"},  {"\r\nOK\r\n"}, 		{1000, 0}, 	1} ,
+			//disable power voltage shutdown
+			{	ATMATCH,	"",		{"AT+QVBATT=1,3300,0\r"},  {"\r\nOK\r\n"}, 		{1000, 0}, 	1} ,
+			//Change GPRS Multi-slot Class
+			//in that mode transmitting consumption = 200mA
+			//Need to reboot GPRS module to take effect
+			{	ATMATCH,	"",		{"AT+QGPCLASS=8\r"},		   {"\r\nOK\r\n"},		{ 300, 0},  1} ,
+			//TX Power Control. Parameters- rf_band, tx_slots, power_control_lvl, reduce dB
+			{	ATMATCH,	"",		{"AT+CDETXPW=900,2,255,2\r"},  {"\r\nOK\r\n"},		{ 300, 0},  1} ,
+			//{	ATMATCH,	"",	{"AT+CDETXPW=900,4,255,5"}  {"\r\nOK\r\n"},	    	{ 300, 0},  1} ,
+			//{	ATMATCH,	"",	{"AT+CDETXPW=900,4,255,8"}  {"\r\nOK\r\n"},	    	{ 300, 0},  1} ,
+			//{	ATMATCH,	"",	{"AT+CDETXPW=900,2,255,2"}  {"\r\nOK\r\n"},	    	{ 300, 0},  1} ,
+			//{	ATMATCH,	"",	{"AT+CDETXPW=1800,2,255,4"}  {"\r\nOK\r\n"},	    { 300, 0},  1} ,
+			//{	ATMATCH,	"",	{"AT+CDETXPW=1800,4,255,6"}  {"\r\nOK\r\n"},	    { 300, 0},  1} ,
+			//{	ATMATCH,	"",	{"AT+CDETXPW=1800,4,255,10"}  {"\r\nOK\r\n"},	    { 300, 0},  1} ,
+
 
 			{	ATGET,		"",		{"AT+CREG?\r"}, 	{NULL, NULL, ValidateReg}, 	{1000, 0}, 	1 } ,
 			{	ATGET,		"",		{"AT+CGREG?\r"},	{NULL, NULL, ValidateReg},	{1000, 0}, 	1},
