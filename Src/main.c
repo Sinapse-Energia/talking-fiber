@@ -101,6 +101,8 @@ uint8_t timeoutGPRS=0; 						/// At beginning this is 0
 
 extern DMA_HandleTypeDef hdma_usart6_rx;
 
+char *Read_TFVOL(const char *);
+
 int elapsed10secondsAux=0;
 uint8_t LOG_ACTIVATED=0;				 		/// Enable to 1 if you want to show log through logUART
 uint8_t LOG_GPRS=0;  							/// For showing only GPRS information
@@ -705,7 +707,7 @@ int main(void)
 #if defined(ENABLE_ALERT)
           if (nowMinute % atoi(GetVariable("TFALM")) == 0)
           {
-        	  int mv = atoi(GetVariable("TFVOL"));
+        	  int mv = atoi(Read_TFVOL("-1"));
         	  if (mv < atoi(GetVariable("TFATH")))
         	  {
 

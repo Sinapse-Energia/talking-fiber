@@ -15,6 +15,8 @@ extern "C" {
 
 		char			*BuildListEPD	(const char *);
 
+		char 			*Read_TFVOL		(const char *);
+
 
 #ifdef __cplusplus
 }
