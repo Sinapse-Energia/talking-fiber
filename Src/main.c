@@ -694,8 +694,10 @@ int main(void)
 
           SaveDevParamsToNVM();
 
+          int nowAbsMinute = nowMinute + nowHour * 60;
+
 #if defined(ENABLE_PERIODIC)
-          if (nowMinute % atoi(GetVariable("TFPER")) == 0)
+          if (nowAbsMinute % atoi(GetVariable("TFPER")) == 0)
           {
 #ifdef CONNECT_ONLY_TO_SEND_WORKAROUND
         	  NVIC_SystemReset();
@@ -705,7 +707,7 @@ int main(void)
           }
 #endif
 #if defined(ENABLE_ALERT)
-          if (nowMinute % atoi(GetVariable("TFALM")) == 0)
+          if (nowAbsMinute % atoi(GetVariable("TFALM")) == 0)
           {
         	  int mv = atoi(Read_TFVOL("-1"));
         	  if (mv < atoi(GetVariable("TFATH")))
@@ -717,8 +719,8 @@ int main(void)
         		  ExecAlert(mv);
 #endif
         	  }
-#endif
           }
+#endif
       }
 
 #if defined(TIME_CORRECT_PERIODICALLY)
