@@ -37,37 +37,22 @@ typedef struct DevParamTypeStruct
 } DevParam_T;
 
 static const DevParam_T devParams[] = {
-        { "DAVER", "0.1",                               TYPE_STR }, // 0
-        { "BNAME", "",                                  TYPE_STR },
-        { "BUSER", "",                                  TYPE_STR },
-        { "BPSWD", "",                                  TYPE_STR },
         { "ANAME", "www.ab.kyivstar.net",               TYPE_STR },
         { "AUSER", "",                                  TYPE_STR },
         { "APSWD", "",                                  TYPE_STR },
         { "MURI",  "soporte-tecnico.bitnamiapp.com",    TYPE_STR },
         { "MUSER", "",                                  TYPE_STR },
         { "MPSWD", "",                                  TYPE_STR },
-        { "BMURI", "soporte-tecnico.bitnamiapp.com",    TYPE_STR }, // 10
+        { "BMURI", "soporte-tecnico.bitnamiapp.com",    TYPE_STR },
         { "BMUSR", "",                                  TYPE_STR },
         { "BMPSW", "",                                  TYPE_STR },
-        { "MCLID", "",                                  TYPE_STR },
         { "MTPRT", "TESTING_TF",                        TYPE_STR },
         { "DODPT", "TF/MEASUREMENTS",                   TYPE_STR },
         { "DOPPT", "TF/PERIODIC",                       TYPE_STR },
         { "DALPT", "TF/ALERTS",                         TYPE_STR },
-        { "EODPT", "EPD/MEASUREMENTS",                  TYPE_STR },
-        { "EOPPT", "EPD/PERIODIC",                      TYPE_STR },
-        { "EALPT", "EPD/ALERTS",                        TYPE_STR }, // 20
-        { "ETIGL", "30",                                TYPE_INT },
         { "ID",    "999998",                            TYPE_STR },
         { "DGRID", "FFFFFF",                            TYPE_STR },
-        { "GDROS", "00000000000000000000000000000000",  TYPE_STR },
-        { "GDGPS", "00000000000000000000000000000000",  TYPE_STR },
-        { "DDOVL", "00000000000000000000000000000000",  TYPE_STR },
-        { "DELST", "0",                                 TYPE_INT },
-        { "DSAST", "00000000000000000000000000000000",  TYPE_STR },
-        { "DLKST", "00000000000000000000000000000000",  TYPE_STR },
-        { "GPSSSH", "21",                               TYPE_INT }, // 30
+        { "GPSSSH", "21",                               TYPE_INT },
         { "GPSSSM", "0",                                TYPE_INT },
         { "GPSSRH", "6",                                TYPE_INT },
         { "GPSSRM", "0",                                TYPE_INT },
@@ -75,44 +60,19 @@ static const DevParam_T devParams[] = {
         { "GPSLON", "0",                                TYPE_STR },
         { "MPORT", "1883",                              TYPE_INT },
         { "BMPRT", "1883",                              TYPE_INT },
-        { "NEWID", "-1",                                TYPE_STR },
         { "UTCOF", "0",                                 TYPE_INT },
-        { "TIMEFL", "0",                                TYPE_STR }, // 40
-        { "LTIME",    "",                               TYPE_STR }, // 181 41
-        { "GPSSST",   "00:00",                          TYPE_STR },
-        { "GPSSRT",   "00:00",                          TYPE_STR },
-        { "GNURXP",   "",                               TYPE_STR },
-        { "GNURXT",   "0",                              TYPE_INT },
-        { "GNUNUM",   "0",                              TYPE_INT },
-        { "GNUTXP",   "",                               TYPE_STR },
-        { "GNUFRM",   "",                               TYPE_STR },
-        { "GNULOC",   "0",                              TYPE_INT },
-        { "GNULAT",   "-1",                             TYPE_STR }, // 190 50
-        { "GNULON",   "-1",                             TYPE_STR },
-        { "GNUBDR",   "9600",                           TYPE_INT },
-        { "GNUDTB",   "8",                              TYPE_INT },
-        { "GNUSTB",   "1",                              TYPE_INT },
-        { "GNUPAR",   "0",                              TYPE_INT },
-        { "GNUCFR",   "Ok",                             TYPE_STR },
-        { "GNRFTX",   "",                               TYPE_STR },
-        { "GNMBID",   "1",                              TYPE_INT },
-        { "GNMBPS",   "0",                              TYPE_INT },
-        { "GNMBBS",   "2",                              TYPE_INT }, // 200 60
-        { "GNMBPL",   "",                               TYPE_STR },
-        { "GNMBTS",   "0",                              TYPE_INT },
-        { "BTLSER",   "",                               TYPE_STR }, // 203 63
+        { "BTLSER",   "",                               TYPE_STR },
         { "BTLPRT",   "",                               TYPE_INT },
         { "BTLPRO",   "",                               TYPE_STR },
         { "BTLPAT",   "",                               TYPE_STR },
         { "BTLNAM",   "",                               TYPE_STR },
         { "BTLUSR",   "",                               TYPE_STR },
         { "BTLPAS",   "",                               TYPE_STR },
-        { "BTLCNT",   "",                               TYPE_INT }, // 210 70
+        { "BTLCNT",   "",                               TYPE_INT },
         { "BTLAUS",   "",                               TYPE_STR },
         { "BTLAPS",   "",                               TYPE_STR },
-        { "BTLVER",   "",                               TYPE_STR }, // 213 73
+        { "BTLVER",   "",                               TYPE_STR },
         { "BTLRES",   "0",                              TYPE_INT },
-        { "NEWRT",    "-1",                             TYPE_STR },
 
 		{ "TFVOL",    "-1",                             TYPE_STR },
 		{ "TFVTS",    "0",                              TYPE_INT },
@@ -120,10 +80,6 @@ static const DevParam_T devParams[] = {
 		{ "TFALM",    DEFAULT_ALERT_M,                  TYPE_INT },
 		{ "TFATH",    DEFAULT_ALERT_TH,                 TYPE_INT },
 };
-// This variable needed to control places in code that rely on devParams array
-// You should change this variable each time you change devParams array
-#define DEV_PARAMS_REVISION 0x0F01
-#warning "Dont forget to change revision, if you have add or remove some params."
 
 #define DEVICE_PARAMS_CNT (sizeof(devParams)/sizeof(devParams[0]))
 
@@ -293,9 +249,6 @@ int	 CreateContext()
 //	if(res != FR_OK) ContextErrorHandler();
 #endif
 
-	SharedMemoryData sharedData;
-	ReadSharedMemory(&sharedData);
-
     static CVariable *ALLVARS[DEVICE_PARAMS_CNT+1];
     ALLVARS[DEVICE_PARAMS_CNT] = NULL;
 
@@ -311,60 +264,6 @@ int	 CreateContext()
 	    const char* value = UnpackDevVariable(devParams[i].name, devParamsBuf, bytesread);
 	    if (value == NULL) value = devParams[i].defval;
 
-#if (DEV_PARAMS_REVISION != 0x0F01)
-#error "To change this index to BTLSER index because devParams changed !!!"
-#endif
-        if (i >= 63 && i <= 73)
-        {
-            switch (i)
-            {
-            case 63:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.FW_SERVER_URI));
-                break;
-            case 64:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarint(sharedData.variables.PORT));
-                break;
-            case 65:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.PROTOCOL));
-                break;
-            case 66:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.PATH));
-                break;
-            case 67:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.FW_NAME));
-                break;
-            case 68:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.USER));
-                break;
-            case 69:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.PASSWORD));
-                break;
-            case 70:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarint(sharedData.variables.UPDFW_COUNT));
-                break;
-            case 71:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring("-1"));
-                break;
-            case 72:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring("-1"));
-                break;
-            case 73:
-                ALLVARS[i] = new CVariable (devParams[i].name, devParams[i].name,
-                    new CVarstring(sharedData.variables.FW_VERSION));
-                break;
-            }
-        }
-        else
 	    switch (devParams[i].type)
 	    {
 	    case TYPE_INT:
@@ -387,6 +286,29 @@ int	 CreateContext()
 	return 1;
 }
 
+int RestoreSharedValues(void)
+{
+    SharedMemoryData sharedData;
+    ReadSharedMemory(&sharedData);
+    char buf[8];
+
+    SetVariable((char*)"BTLSER", sharedData.variables.FW_SERVER_URI);
+    sprintf(buf, "%i", (int)(sharedData.variables.PORT));
+    SetVariable((char*)"BTLPRT", buf);
+    SetVariable((char*)"BTLPRO", sharedData.variables.PROTOCOL);
+    SetVariable((char*)"BTLPAT", sharedData.variables.PATH);
+    SetVariable((char*)"BTLNAM", sharedData.variables.FW_NAME);
+    SetVariable((char*)"BTLUSR", sharedData.variables.USER);
+    SetVariable((char*)"BTLPAS", sharedData.variables.PASSWORD);
+    sprintf(buf, "%i", (int)(sharedData.variables.UPDFW_COUNT));
+    SetVariable((char*)"BTLCNT", buf);
+    SetVariable((char*)"BTLAUS", (char*)"-1");
+    SetVariable((char*)"BTLAPS", (char*)"-1");
+    SetVariable((char*)"BTLVER", sharedData.variables.FW_VERSION);
+
+    return 1;
+}
+
 // This is a PROVISIONAL way of populating the input and output Framesets
 //	IMPORTANT:	the OutAPI array has to be populated BEFORE,
 //				because input frames can eventually reference output frames as replay
@@ -402,10 +324,7 @@ int	 CreateContext()
 int	 ReadMetadata(char *dominioIn, char *dominioOut){
 	const char	*linesOut[] = {
 		"ERROR%999;$MSSG;Unknown message%Error%%",
-		"RSSSR%604;$ID;$GPSLAT;$GPSLON;$GPSSRT;$GPSSST;%Return sunrise and sunset%%",
 		"BTANS%607;$ID;$BTLRES;$BTLVER;$BTLSER;$BTLPRT;$BTLPRO;$BTLPAT;$BTLUSR;$BTLPAS;$BTLCNT;%Bootloader ans%%",
-		"CUAAN%610;TRUE;%customize AP answer%%",
-		"RETFW%609;$ID;$BTLVER;%return FW version%%",
 
 		"L3TFR%L3_TF_STATUS_R;$ID;$TFVOL;$TFVTS;%return photodiode voltage%%",
 
@@ -414,14 +333,11 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 
 	const char	*linesIn[] = {
 
-		// 5; command, set server parameters
 		"CCOMM%5;$MURI;$MPORT;$MUSER;$MPSWD;%configure communications%%",
-		"ASSSR%204;%ask sunrise and sunset%xx%RSSSR%",
-		"STGPS%121;$GPSLAT;$GPSLON;%set GPS coordinates%%",
 		"BTCFG%207;$BTLSER;$BTLPRT;$BTLPRO;$BTLPAT;$BTLNAM;$BTLUSR;$BTLPAS;$BTLCNT;%boot config%xx%BTANS%",
 		"BTACT%208;$BTLAUS;$BTLAPS;%boot act%xx%BTANS%",
-		"CUSAP%210;$NEWID;$NEWRT;%customize AP%xx%CUAAN%",
-		"REQFW%209;%request FW ver%xx%RETFW%",
+		// 314 is done through main function
+		"CHAPN%175;$ANAME;%configure APN%%",
 
 		"L3TFD%L3_TF_STATUS_OD;%request diode voltage%xx%L3TFR%",
 

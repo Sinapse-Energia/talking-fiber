@@ -24,79 +24,6 @@
 #include "Shared.h"
 
 /************************************************
-			PROVISIONAL
- A helper function to simulate a INTEGER variable
-	ranging within  MIN and MAX
-  ************************************/
-
-// Parse HEX from text, return position to char after parsed or NULL if fail
-char* parseHexByte(char* in_text, uint8_t* out_byte)
-{
-	// Skip spaces
-	while (*in_text == ' ') in_text++;
-	// Check for end of text
-	if (*in_text == '\0') return NULL;
-	// Normalize symbol
-	char sym = (char)toupper(*in_text);
-	// Check format
-	if (sym < '0' || (sym > '9' && sym < 'A') || sym > 'F') return NULL;
-	// Decode symbol
-	uint8_t byte = ((sym < 'A') ? (sym - '0') : (sym - 'A' + 10)) & 0x0F;
-	byte = byte << 4;
-
-	// Go to next symbol
-	in_text++;
-
-	// Find and parse low 4 bits value
-
-	// Skip spaces
-	while (*in_text == ' ') in_text++;
-	// Check for end of payload
-	if (*in_text == '\0') return NULL;
-	// Normalize symbol
-	sym = (char)toupper(*in_text);
-	// Check format
-	if (sym < '0' || (sym > '9' && sym < 'A') || sym > 'F') return NULL;
-	// Decode symbol
-	byte |= (((sym < 'A') ? (sym - '0') : (sym - 'A' + 10)) & 0x0F);
-
-	// Go to next symbol
-	in_text++;
-
-	*out_byte = byte;
-
-	return in_text;
-}
-
-char	*VariableInt(int min, int max) {
-	static char result[16];
-	int x =  min + rand()%(max-min);
-	itoa(x, result, 10);
-	return result;
-}
-
-// Id for DECIMAL VARIABLES (one decimal figure output)
-char	*VariableDec(double min, double max) {
-	static char result[16];
-	float r = (float)rand()/(float)RAND_MAX;
-	double x = min + r * (max-min);	
-	int intp = (int) x;
-	int fracp = (int) ((r - x)* 10 );
-	sprintf(result, "%d.%1d", intp, fracp);
-	return result;
-}
-
-int randInt(int min, int max)
-{
-	return (min + rand() * (max - min) / RAND_MAX);
-}
-
-float randFloat(float min, float max)
-{
-	return (min + rand() * (max - min) / RAND_MAX);
-}
-
-/************************************************
 	PLACEHOLDERS for the real READING wrappers
 *************************************************/
 
@@ -126,29 +53,6 @@ char *Read_TFVOL(const char *value)
 	static char tfvoltbuf[16];
 	snprintf(tfvoltbuf, 16, "%d.%02d", (int)pfm_to_analogue, abs((int)(pfm_to_analogue*100.0f))%100);
 	return tfvoltbuf;
-}
-
-char *Read_LTIME(const char *value)
-{
-	return GetDateTime();
-}
-
-char *Read_GPSSST(const char *value)
-{
-	static char timeSSbuf[6];
-	int timeSSHour = atoi(GetVariable((char*)"GPSSSH"));
-	int timeSSMinute = atoi(GetVariable((char*)"GPSSSM"));
-	sprintf(timeSSbuf, "%02i:%02i", timeSSHour, timeSSMinute);
-	return &timeSSbuf[0];
-}
-
-char *Read_GPSSRT(const char *value)
-{
-	static char timeSRbuf[6];
-	int timeSRHour = atoi(GetVariable((char*)"GPSSRH"));
-	int timeSRMinute = atoi(GetVariable((char*)"GPSSRM"));
-	sprintf(timeSRbuf, "%02i:%02i", timeSRHour, timeSRMinute);
-	return &timeSRbuf[0];
 }
 
 char* Write_HourMinute(const char *value, const char *minuteName)
@@ -226,56 +130,6 @@ char* Write_HourMinute(const char *value, const char *minuteName)
 	return (char*)value;
 }
 
-char *Write_NEWRT(const char *value)
-{
-	if (strcmp("-1", value) != 0)
-		SetVariable((char*)"MTPRT", (char*)value);
-
-	return (char*)value;
-}
-
-char *Write_NEWID(const char *value)
-{
-	if (strcmp("-1", value) != 0)
-		SetVariable((char*)"ID", (char*)value);
-
-	return (char*)value;
-}
-
-int Post_STGPS()
-{
-	// Get coordinates
-	double lat = atof(GetVariable((char*)"GPSLAT"));
-	double lon = atof(GetVariable((char*)"GPSLON"));
-
-	// Get date
-	int nowDay = 0, nowMonth = 0, nowYear = 0;
-	getDate(&nowDay, &nowMonth, &nowYear);
-
-	// Calculate SR/SS
-	int srHour = 6, srMin = 0, ssHour = 21, ssMin = 0;
-	CalculateSunRiseSetTimes(lat, lon,
-			nowYear, nowMonth, nowDay,
-			&srHour, &srMin, &ssHour, &ssMin);
-
-	char buf[8];
-
-	// Set SR/SS variables
-	sprintf(buf, "%i", srHour);
-	SetVariable((char*)"GPSSRH", buf);
-	sprintf(buf, "%i", srMin);
-	SetVariable((char*)"GPSSRM", buf);
-	sprintf(buf, "%i", ssHour);
-	SetVariable((char*)"GPSSSH", buf);
-	sprintf(buf, "%i", ssMin);
-	SetVariable((char*)"GPSSSM", buf);
-
-	// Reboot to calculate UTC offset
-	REBOOT();
-
-	return 1;
-}
-
 int Post_BTCFG()
 {
 	SharedMemoryData sharedData;
@@ -342,12 +196,6 @@ int Post_BTACT()
 // HOOK of functions to be called with a context variable is modified
 struct	st_wrapper	dispatch[] = {
 
-	"LTIME",		Read_LTIME,		NULL,
-	"GPSSST",		Read_GPSSST,	NULL,
-	"GPSSRT",		Read_GPSSRT,	NULL,
-	"NEWRT",		NULL,			Write_NEWRT,
-	"NEWID",		NULL,			Write_NEWID,
-
 	"TFVOL",		Read_TFVOL,		NULL,
 
 	NULL
@@ -357,10 +205,9 @@ struct	st_wrapper	dispatch[] = {
 struct	st_fractions
 	actions[] = {
 	"CCOMM", 	NULL,  			NEWCONN,
-	"STGPS",	NULL,			Post_STGPS,
 	"BTCFG",	NULL,			Post_BTCFG,
 	"BTACT",	NULL,			Post_BTACT,
-	"CUSAP",	NULL,			REBOOT,
+	"CHAPN",    NULL,           NEWCONN,
 
 	NULL
 };

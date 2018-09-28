@@ -144,8 +144,6 @@ int prevMinute = 0, prevHour = 0;
 int lastTimeCorrectHour = 0;
 #endif
 
-volatile bool rebootScheduled = false;
-volatile long rebootAtTimestamp = 0;
 volatile bool reconnectScheduled = false;
 
 /* USER CODE END PV */
@@ -159,13 +157,6 @@ void SystemClock_Config(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
-int REBOOT()
-{
-    rebootAtTimestamp = GetTimeStamp() + 5; // restart in 5 seconds
-    rebootScheduled = true;
-    return 1;
-}
 
 int NEWCONN()
 {
@@ -255,10 +246,8 @@ void OnDemandHander()
         // By default publish to debug
         sprintf(outtopic, "%s/CMC/DEBUG", GetVariable("MTPRT"));
 
-        if ((strlen(mssg) >= 4 && memcmp("204;", mssg, 4) == 0) ||
-                (strlen(mssg) >= 4 && memcmp("207;", mssg, 4) == 0) ||
-                (strlen(mssg) >= 4 && memcmp("208;", mssg, 4) == 0) ||
-                (strlen(mssg) >= 4 && memcmp("209;", mssg, 4) == 0))
+        if ((strlen(mssg) >= 4 && memcmp("207;", mssg, 4) == 0) ||
+            (strlen(mssg) >= 4 && memcmp("208;", mssg, 4) == 0))
         {
             sprintf(outtopic, "%s/CMC/CONFIG", GetVariable("MTPRT"));
         }
@@ -268,28 +257,7 @@ void OnDemandHander()
 
         if ((uint32_t)out != 0 && memcmp("999;", out, 4) == 0)
         { // if Unknown command
-            if (strlen(mssg) >= 4 &&
-                memcmp("398;", mssg, 4) == 0)
-            { // Reboot command received
-                long minutes = 0;
-                if (strlen(mssg) > 4)
-                {
-                    char buf[16] = { 0 };
-                    // Copy minutes to buffer
-                    memcpy(buf, &mssg[4], (strlen(&mssg[4])-1));
-                    // Parse minutes
-                    sscanf(buf, "%li", &minutes);
-                }
-                // Calculate reboot timestamp
-                rebootAtTimestamp = GetTimeStamp() + minutes*60;
-
-                // Schedule reboot
-                rebootScheduled = true;
-
-                // No responce for the Reboot command
-                out = NULL;
-            }
-            else if (strlen(mssg) == 15 &&
+            if (strlen(mssg) == 15 &&
                 memcmp("314;", mssg, 4) == 0 &&
                 memcmp(";12345678;", &mssg[5], 10) == 0)
             { // Erase command received
@@ -298,6 +266,7 @@ void OnDemandHander()
                 out = "714;TRUE;";
 
                 // Erase NVM
+#ifdef USE_SD_CARD
                 switch (mssg[4])
                 {
                 case '0':
@@ -312,6 +281,8 @@ void OnDemandHander()
                 default:
                     out = "714;WrongArgument;";
                 }
+#endif
+                // TODO Erase
 
                 // Send response immediately
                 MqttPutMessage(hmqtt, outtopic, out);
@@ -321,36 +292,6 @@ void OnDemandHander()
 
                 // Reboot device
                 NVIC_SystemReset();
-            }
-            else if (strlen(mssg) > 4 &&
-                memcmp("127;", mssg, 4) == 0)
-            { // Set time command
-
-                // Parse command parameters
-                int yr = -1, mo = -1, da = -1, hr = -1, mn = -1, sc = -1;
-                sscanf(mssg+4, "%d;%d;%d;%d;%d;%d;", &yr, &mo, &da,
-                        &hr, &mn, &sc);
-
-                // Check parameters
-                if (!(yr < 0 || mo < 1 || mo > 12 || da < 1 || da > 31 ||
-                        hr < 0 || hr > 23 || mn < 0 || mn > 59 ||
-                        sc < 0 || sc > 59))
-                {
-                    // Normalize year
-                    yr = yr % 100;
-
-                    // Set time
-                    char buf[32];
-                    sprintf(&buf[0], "  %d/%d/%d,%d:%d:%d", yr, mo, da, hr, mn, sc);
-                    SetDateTime(&buf[0]);
-
-                    // Set time changed flag
-                    SetVariable("TIMEFL", "1");
-                    SaveDevParamsToNVM();
-
-                    // No response for the command
-                    out = NULL;
-                }
             }
         }
 
@@ -551,6 +492,8 @@ int main(void)
     // Read the messages's metadata
     ReadMetadata("", "");
 
+    RestoreSharedValues();
+
     // Initialize debug topic
     sprintf (topictr, "%s/CMC/DEBUG", GetVariable("MTPRT"));
 
@@ -559,11 +502,7 @@ int main(void)
 #endif
 
 #ifdef HYBRID_M95_WLAN_CODE
-    if (GetVariable("TIMEFL")[0] == '0')
-    {
-        transport_get_time();
-    }
-
+    transport_get_time();
 //    transport_update_tz();
 #endif
 
@@ -619,15 +558,6 @@ int main(void)
 #endif
 
 #ifndef CONNECT_ONLY_TO_SEND_WORKAROUND
-      // Check for Reboot scheduled
-      if (rebootScheduled && (GetTimeStamp() >= rebootAtTimestamp))
-      {
-          SaveDevParamsToNVM();
-          tprintf(hmqtt, "Reboot!");
-          //rebootScheduled = false;
-          NVIC_SystemReset();
-      }
-
       // Check for reconnect scheduled
       if (reconnectScheduled)
       {
@@ -728,14 +658,7 @@ int main(void)
               (nowHour % TIME_CORRECT_PERIOD_HOURS) == 0)
       {
           lastTimeCorrectHour = nowHour;
-
-          if (GetVariable("TIMEFL")[0] == '0')
-          {
-              // Performing reboot because for time correcting we need to
-              // Disconnect from MQTT - connect to TIME - get time - disconnect from TIME - connect to MQTT
-              // And this is the same as reboot
-              REBOOT();
-          }
+          // TODO correct time with server
       }
 #endif
   }

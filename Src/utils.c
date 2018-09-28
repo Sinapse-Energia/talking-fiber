@@ -283,10 +283,6 @@ int	SetIMEI(const char *txt){
 		*p = 0;
 	SetVariable ("IMEI", IMEI);
 
-	// If ID was previously set with 209; command - dont use IMEI/MAC as ID
-	char* id209 = GetVariable("NEWID");
-	if (strcmp("-1", id209) != 0) return 1;
-
 	// Set ID to last 6 IMEI digits
 	size_t lenIMEI = strlen(IMEI);
 	if (lenIMEI >= 6)

@@ -25,6 +25,7 @@ extern "C" {
 
 	int		CreateContext	();
 	int		ReadMetadata	(char *domainIn, char *domainOut);
+	int     RestoreSharedValues();
 
 	// this function returns the payload in the arrived subscription (on any topic)
 	char	*ProcessMessage	(char *message);
@@ -38,7 +39,6 @@ extern "C" {
 	int		Flush			(void);
 
 	int		NEWCONN			(void);
-	int		REBOOT			(void);
 
 	int 	SaveDevParamsToNVM(void);
 
