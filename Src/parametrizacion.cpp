@@ -76,9 +76,6 @@ static const DevParam_T devParams[] = {
 
 		{ "TFVOL",    "-1",                             TYPE_STR },
 		{ "TFVTS",    "0",                              TYPE_INT },
-		{ "TFPER",    DEFAULT_PERIOD,                   TYPE_INT },
-		{ "TFALM",    DEFAULT_ALERT_M,                  TYPE_INT },
-		{ "TFATH",    DEFAULT_ALERT_TH,                 TYPE_INT },
 
 		{ "LISEN",    "1",                              TYPE_INT },
 		{ "TLSTH",    "0",                              TYPE_INT },

@@ -146,6 +146,8 @@ int lastTimeCorrectHour = 0;
 
 volatile bool reconnectScheduled = false;
 
+bool connected  = false;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -188,11 +190,12 @@ void Modem_preinit()
     } while  (rc2 != HAL_OK);
 }
 
-int Reconnect(int *handle)
+int Reconnect(int *handle, int maxtries)
 {
     if (*handle > 0) MqttDisconnect(*handle);
     int ntries = 0;
     do {
+        if (maxtries > 0 && ntries > maxtries) return ntries;
         *handle = COMM_Init();
         ntries++;
     } while (*handle <= 0);
@@ -204,21 +207,23 @@ int Reconnect(int *handle)
 #endif
     }
 
+    connected = true;
+
     return ntries;
 }
 
 void Disconnect()
 {
-#ifndef CONNECT_ONLY_TO_SEND_WORKAROUND
     MqttDisconnect(hmqtt);
-#endif
     hmqtt = 0;
     static const char pwroffCmd[] = "AT+QPOWD=1\r";
     HAL_UART_Transmit(&HUART_GPRS, (uint8_t*)pwroffCmd, strlen(pwroffCmd), 1000);
 //    HAL_GPIO_WritePin(EX_ENABLE_GPRS_BATTERY_GPIO_Port, EX_ENABLE_GPRS_BATTERY_Pin, GPIO_PIN_RESET);
+
+    connected = false;
 }
 
-void OnDemandHander()
+int OnDemandHander(int connretries)
 {
     char inbuffer[256];
     char intopic[64];
@@ -307,7 +312,8 @@ void OnDemandHander()
             int rc = MqttPutMessage(hmqtt, outtopic, out);
             if (rc < 1)
             {
-                int n = Reconnect(&hmqtt);
+                int n = Reconnect(&hmqtt, connretries);
+                if (hmqtt < 1) return -1;
                 tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
             }
         }
@@ -327,7 +333,8 @@ void OnDemandHander()
 
               // Reconnect
               tprintf(hmqtt, "Ready  to reconnexion or reboot!!! ");
-              int ntries = Reconnect(&hmqtt);
+              int ntries = Reconnect(&hmqtt, connretries);
+              if (hmqtt < 1) return -1;
               tprintf(hmqtt, "Hearing recovered after %d tries!!", ntries);
             }
             else
@@ -338,62 +345,8 @@ void OnDemandHander()
             cnomssg = 0;
         }
     }
-}
 
-void ExecPeriodic(void)
-{
-	char *out = ProcessMessage("L3_TF_STATUS_OD;");
-	// put out into send buffer
-	if ((uint32_t)out != 0)
-	{
-		char outtopic[64];
-		// Topic to publish answer
-		sprintf(outtopic, "%s/%s",
-			  GetVariable("MTPRT"),
-			  GetVariable("DOPPT"));
-	#if defined(CONNECT_ONLY_TO_SEND)
-		Modem_preinit();
-		Reconnect(&hmqtt);
-		tprintf(hmqtt, "Connected!");
-	#endif
-		int rc = MqttPutMessage(hmqtt, outtopic, out);
-		if (rc < 1)
-		{
-			int n = Reconnect(&hmqtt);
-			tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
-		}
-	#if defined(CONNECT_ONLY_TO_SEND)
-		tprintf(hmqtt, "Disconnecting!");
-		Disconnect();
-	#endif
-	}
-}
-
-void ExecAlert(int mv)
-{
-	char outtopic[64];
-	char out[64];
-	snprintf(out, 128, "L3_TF_ALERT;%s;%i;%s;",
-			GetVariable("ID"), mv, GetVariable("TFVTS"));
-	// Topic to publish answer
-	sprintf(outtopic, "%s/%s",
-			GetVariable("MTPRT"),
-			GetVariable("DALPT"));
-#if defined(CONNECT_ONLY_TO_SEND)
-	Modem_preinit();
-	Reconnect(&hmqtt);
-	tprintf(hmqtt, "Connected!");
-#endif
-	int rc = MqttPutMessage(hmqtt, outtopic, out);
-	if (rc < 1)
-	{
-		int n = Reconnect(&hmqtt);
-		tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
-	}
-#if defined(CONNECT_ONLY_TO_SEND)
-	tprintf(hmqtt, "Disconnecting!");
-	Disconnect();
-#endif
+    return 0;
 }
 
 /**
@@ -429,6 +382,11 @@ void Sleep_Delay(uint32_t sec)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+
+  int listries = 0;
+  int statries = 0;
+  bool statussent = false;
+  bool alertsent = false;
 
 	__enable_irq();
 
@@ -512,7 +470,7 @@ int main(void)
 //    transport_update_tz();
 #endif
 
-    Reconnect(&hmqtt);
+    //Reconnect(&hmqtt);
 
 #if defined(DEBUG_ENABLE_MQTT_QUEUE_PUB)
     // Update debug topic - ID could be changed after connection (IMEI case)
@@ -523,23 +481,9 @@ int main(void)
     lastTimeCorrectHour = atoi(getHour());
 #endif
 
-#ifdef CONNECT_ONLY_TO_SEND_WORKAROUND
-#if defined(ENABLE_PERIODIC)
-	  ExecPeriodic();
-#endif
-#if defined(ENABLE_ALERT)
-	  int mv = atoi(GetVariable("TFVOL"));
-	  if (mv < atoi(GetVariable("TFATH")))
-	  {
-		  ExecAlert(mv);
-	  }
-#endif
-#endif
-
-#if defined(CONNECT_ONLY_TO_SEND) || defined(CONNECT_ONLY_TO_SEND_WORKAROUND)
     // Disconnect and disable M95
     Disconnect();
-#endif
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -554,16 +498,12 @@ int main(void)
       // Blink once a second with green RGB if connected
       /*if (hmqtt > 0)*/ RGB_Color_Blink(RGB_COLOR_GREEN);
 
+      // Duplicate GPRS status pin on LED CYAN
       if (HAL_GPIO_ReadPin(M95_STATUS_GPIO_Port, M95_STATUS_Pin) == GPIO_PIN_SET)
     	  RGB_Color_Set(RGB_COLOR_CYAN);
       else
     	  RGB_Color_Set(RGB_COLOR_OFF);
 
-#if !defined(CONNECT_ONLY_TO_SEND) && !defined(CONNECT_ONLY_TO_SEND_WORKAROUND)
-      OnDemandHander();
-#endif
-
-#ifndef CONNECT_ONLY_TO_SEND_WORKAROUND
       // Check for reconnect scheduled
       if (reconnectScheduled)
       {
@@ -576,13 +516,12 @@ int main(void)
               "Go to DISCONNECT from this server and connect to %s:%d.\nBye",
                   host, port);
 
-          Reconnect(&hmqtt);
+          Reconnect(&hmqtt, -1);
 
           tprintf(hmqtt, "This has been a RECONNECTION!!!");
 
           reconnectScheduled = false;
       }
-#endif
 
       // Each minute perform scheduler tasks
 
@@ -632,31 +571,153 @@ int main(void)
 
           int nowAbsMinute = nowMinute + nowHour * 60;
 
-#if defined(ENABLE_PERIODIC)
-          if (nowAbsMinute % atoi(GetVariable("TFPER")) == 0)
+          // Listen state check
+          if (atoi(GetVariable("LISEN")) == 1)
           {
-#ifdef CONNECT_ONLY_TO_SEND_WORKAROUND
-        	  NVIC_SystemReset();
-#else
-              ExecPeriodic();
-#endif
-          }
-#endif
-#if defined(ENABLE_ALERT)
-          if (nowAbsMinute % atoi(GetVariable("TFALM")) == 0)
-          {
-        	  int mv = atoi(Read_TFVOL("-1"));
-        	  if (mv < atoi(GetVariable("TFATH")))
-        	  {
+              int startAbsMinute = atoi(GetVariable("TLSTH"))*60 +
+                      atoi(GetVariable("TLSTM"));
+              int stopAbsMinute = startAbsMinute + atoi(GetVariable("TLDUR"));
 
-#ifdef CONNECT_ONLY_TO_SEND_WORKAROUND
-        		  NVIC_SystemReset();
-#else
-        		  ExecAlert(mv);
-#endif
-        	  }
+              // Go to listen state if it is time
+              if (nowAbsMinute > startAbsMinute && nowAbsMinute < stopAbsMinute)
+              {
+                  // Check connect tries counter - not try to connect more than
+                  // TLRTN times from start of the listen time
+                  if (listries < atoi(GetVariable("TLRTN")))
+                  {
+                      // Try to connect
+                      Modem_preinit();
+                      listries = Reconnect(&hmqtt, atoi(GetVariable("TLRTN")));
+                      // If connected - listen for messages all the listen time
+                      if (hmqtt > 0)
+                      {
+                          do {
+                              if (OnDemandHander(atoi(GetVariable("TLRTN"))) != 0)
+                                      break;
+                              nowHour = atoi(getHour());
+                              nowMinute = atoi(getMinute());
+                              nowAbsMinute = nowMinute + nowHour * 60;
+                          } while (nowAbsMinute < stopAbsMinute);
+                      }
+                      // Disconnect after the listen time
+                      Disconnect();
+                  }
+              }
+              // If it is not listen state time - erase connect tries counter
+              else if (listries > 0)
+              {
+                  listries = 0;
+              }
           }
-#endif
+
+          // Send status check
+          if (nowAbsMinute % atoi(GetVariable("TSPER")) == 0)
+          {
+              // Not send if already sent
+              // Not try to connect more than TSRTN times
+              if (!statussent && listries < atoi(GetVariable("TSRTN")))
+              {
+                  int stopAbsMinute = nowAbsMinute + atoi(GetVariable("TSLDR"));
+
+                  // Publish status
+                  char *out = ProcessMessage("L3_TF_STATUS_OD;");
+                  if ((uint32_t)out != 0)
+                  {
+                      // Topic to publish answer
+                      char outtopic[64];
+                      sprintf(outtopic, "%s/%s",
+                            GetVariable("MTPRT"),
+                            GetVariable("DOPPT"));
+
+                      // Try to connect
+                      Modem_preinit();
+                      statries = Reconnect(&hmqtt, atoi(GetVariable("TSRTN")));
+
+                      // Publish if connected
+                      if (hmqtt > 0)
+                      {
+                          statries--;
+                          while (MqttPutMessage(hmqtt, outtopic, out) < 1 &&
+                                  statries < atoi(GetVariable("TSRTN")))
+                          {
+                              statries += Reconnect(&hmqtt, atoi(GetVariable("TSRTN")));
+                              if (hmqtt > 0)
+                                  tprintf(hmqtt, "RECONNECTED because of "
+                                          "communication breakdown after %i tries!!!!",
+                                          statries);
+                              else break;
+                          }
+                      }
+
+                      if (hmqtt > 0)
+                      {
+                          while (nowAbsMinute < stopAbsMinute) {
+                              if (OnDemandHander(atoi(GetVariable("TSRTN"))) != 0)
+                                      break;
+                              nowHour = atoi(getHour());
+                              nowMinute = atoi(getMinute());
+                              nowAbsMinute = nowMinute + nowHour * 60;
+                          }
+                      }
+
+                      Disconnect();
+                  }
+              }
+          }
+          else
+          {
+              if (statussent)
+              {
+                  statussent = false;
+              }
+              if (statries > 0)
+              {
+                  statries = 0;
+              }
+          }
+
+          // Send alert check
+          if (nowAbsMinute % atoi(GetVariable("TAPER")) == 0)
+          {
+              // Not send if already sent
+              if (!alertsent)
+              {
+                  int mv = atoi(Read_TFVOL("-1"));
+                  if (mv < atoi(GetVariable("TATHL")) ||
+                          mv > atoi(GetVariable("TATHH")))
+                  {
+                      char outtopic[64];
+                      char out[64];
+                      snprintf(out, 128, "L3_TF_ALERT;%s;%i;%s;",
+                              GetVariable("ID"), mv, GetVariable("TFVTS"));
+                      // Topic to publish answer
+                      sprintf(outtopic, "%s/%s",
+                              GetVariable("MTPRT"),
+                              GetVariable("DALPT"));
+
+                      Modem_preinit();
+                      Reconnect(&hmqtt, -1);
+
+                      int rc = MqttPutMessage(hmqtt, outtopic, out);
+                      if (rc < 1)
+                      {
+                          int n = Reconnect(&hmqtt, -1);
+                          tprintf(hmqtt, "RECONNECTED because of communication breakdown after %i tries!!!!", n);
+                      }
+
+                      Disconnect();
+                  }
+
+                  alertsent = true;
+              }
+          }
+          else
+          {
+              if (alertsent)
+              {
+                  alertsent = false;
+              }
+          }
       }
 
 #if defined(TIME_CORRECT_PERIODICALLY)
