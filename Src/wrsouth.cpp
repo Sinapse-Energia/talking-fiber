@@ -34,8 +34,31 @@ char *Read_TFVOL(const char *value)
     HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_RESET);
     HAL_Delay(TF_PHOTO_POWER_DELAY_MSEC);
 
-	// Read ADC diode voltage
-	float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6) * 1000; // in mV
+    // Read ADC diode voltage
+    float samples[TF_PHOTO_SAMPLES];
+    int minInd = 0, maxInd = 0;
+
+    samples[0] = adc_read_val(ADC_CHANNEL_6);
+	for (int i = 1; i < TF_PHOTO_SAMPLES; i++)
+	{
+	    samples[i] = adc_read_val(ADC_CHANNEL_6);
+	    if (samples[i] > samples[maxInd])
+	        maxInd = i;
+	    if (samples[i] < samples[minInd])
+	        minInd = i;
+	}
+
+	// Calculate average
+	float sum = 0;
+	int n = 0;
+	for (int i = 0; i < TF_PHOTO_SAMPLES; i++)
+	{
+	    if (i == minInd || i == maxInd) continue;
+	    sum += samples[i];
+	    n++;
+	}
+
+    float pfm_to_analogue = (sum / n) * 1000; // in mV
 	// PFM_TO_ANALOGUE = (VDD_PHOTODIODE/2)-R_23_1*Iphotodiode
 	//float Iphotodiode = (VDD_PHOTODIODE/2 - pfm_to_analogue) / R_23_1;
 
