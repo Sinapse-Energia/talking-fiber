@@ -241,6 +241,25 @@ int Post_CONSN()
     return 1;
 }
 
+int Post_CONAL()
+{
+    int TAPER = atoi(GetVariable((char*)"TAPER"));
+    int TATHL = atoi(GetVariable((char*)"TATHL"));
+    int TATHH = atoi(GetVariable((char*)"TATHH"));
+
+    if (TAPER < 0 || TATHL < 0 || TATHH < 0 || TATHL > TATHH)
+    {
+        // Error TODO need mechanism in context to restore variables
+        SetVariable((char*)"TARES", (char*)"0");
+    }
+    else
+    {
+        SetVariable((char*)"TARES", (char*)"1");
+    }
+
+    return 1;
+}
+
 // HOOK of functions to be called with a context variable is modified
 struct	st_wrapper	dispatch[] = {
 
@@ -259,6 +278,7 @@ struct	st_fractions
 	"CHAPN",    NULL,           NEWCONN,
 	"CONLS",    NULL,           Post_CONLS,
 	"CONSN",    NULL,           Post_CONSN,
+	"CONAL",    NULL,           Post_CONAL,
 
 	NULL
 };

@@ -251,7 +251,9 @@ void OnDemandHander()
             (strlen(mssg) >= 24 &&
                     memcmp("L3_TF_CONF_LISTEN_STATE;", mssg, 24) == 0) ||
             (strlen(mssg) >= 29 &&
-                    memcmp("L3_TF_CONF_SEND_STATUS_STATE;", mssg, 29) == 0))
+                    memcmp("L3_TF_CONF_SEND_STATUS_STATE;", mssg, 29) == 0) ||
+            (strlen(mssg) >= 26 &&
+                    memcmp("L3_TF_CONF_SAMPLING_STATE;", mssg, 26) == 0))
         {
             sprintf(outtopic, "%s/CMC/CONFIG", GetVariable("MTPRT"));
         }
