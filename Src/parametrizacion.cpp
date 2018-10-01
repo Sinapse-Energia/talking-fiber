@@ -86,6 +86,11 @@ static const DevParam_T devParams[] = {
 		{ "TLDUR",    "60",                             TYPE_INT },
 		{ "TLRTN",    "10",                             TYPE_INT },
 		{ "TLRES",    "0",                              TYPE_INT },
+
+		{ "TSPER",    "5",                              TYPE_INT },
+		{ "TSLDR",    "1",                              TYPE_INT },
+		{ "TSRTN",    "10",                             TYPE_INT },
+		{ "TSRES",    "0",                              TYPE_INT },
 };
 
 #define DEVICE_PARAMS_CNT (sizeof(devParams)/sizeof(devParams[0]))
@@ -334,6 +339,7 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 		"BTANS%607;$ID;$BTLRES;$BTLVER;$BTLSER;$BTLPRT;$BTLPRO;$BTLPAT;$BTLUSR;$BTLPAS;$BTLCNT;%Bootloader ans%%",
 
 		"CONLA%L3_TF_CONF_LISTEN_STATE_R;$ID;$TLRES;%listen state%%",
+		"CONSA%L3_TF_CONF_SEND_STATUS_STATE_R;$ID;$TSRES;%status state%%",
 
 		"L3TFR%L3_TF_STATUS_R;$ID;$TFVOL;$TFVTS;%return photodiode voltage%%",
 
@@ -349,6 +355,7 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 		"CHAPN%175;$ANAME;%configure APN%%",
 
 		"CONLS%L3_TF_CONF_LISTEN_STATE;$LISEN;$TLSTH;$TLDUR;$TLRTN;%config listen%xx%CONLA%",
+		"CONSN%L3_TF_CONF_SEND_STATUS_STATE;$TSPER;$TSLDR;$TSRTN;%config status%xx%CONSA%",
 
 		"L3TFD%L3_TF_STATUS_OD;%request diode voltage%xx%L3TFR%",
 

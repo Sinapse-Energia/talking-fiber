@@ -221,6 +221,26 @@ int Post_CONLS()
     return 1;
 }
 
+int Post_CONSN()
+{
+    int TSPER = atoi(GetVariable((char*)"TSPER"));
+    int TSLDR = atoi(GetVariable((char*)"TSLDR"));
+    int TSRTN = atoi(GetVariable((char*)"TSRTN"));
+
+    if (TSPER < 0 || TSLDR < 0 || TSLDR > 60 ||
+            TSRTN < 1 || TSRTN > 10)
+    {
+        // Error TODO need mechanism in context to restore variables
+        SetVariable((char*)"TSRES", (char*)"0");
+    }
+    else
+    {
+        SetVariable((char*)"TSRES", (char*)"1");
+    }
+
+    return 1;
+}
+
 // HOOK of functions to be called with a context variable is modified
 struct	st_wrapper	dispatch[] = {
 
@@ -238,6 +258,7 @@ struct	st_fractions
 	"BTACT",	NULL,			Post_BTACT,
 	"CHAPN",    NULL,           NEWCONN,
 	"CONLS",    NULL,           Post_CONLS,
+	"CONSN",    NULL,           Post_CONSN,
 
 	NULL
 };
