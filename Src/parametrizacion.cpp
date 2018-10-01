@@ -14,6 +14,7 @@
 #include	"utils.h"
 #include	"Shared.h"
 #include    "MQTTAPI.H"
+#include    "southbound_ec.h"
 
 #ifdef USE_SD_CARD
 #include    "fatfs.h"
@@ -97,7 +98,7 @@ static const DevParam_T devParams[] = {
 
 #define DEVICE_PARAMS_CNT (sizeof(devParams)/sizeof(devParams[0]))
 
-#define DEV_PARAMS_BUF_SIZE (5*1024ul)
+#define DEV_PARAMS_BUF_SIZE (2*1024ul)
 
 static char devParamsBuf[DEV_PARAMS_BUF_SIZE];
 
@@ -270,7 +271,9 @@ int	 CreateContext()
     // Read device parameters from NVM
     size_t bytesread = SDCardReadDataFile("DEV", devParamsBuf, DEV_PARAMS_BUF_SIZE);
 #else
+    int len = MIC_Flash_Memory_Read((uint8_t*)devParamsBuf, DEV_PARAMS_BUF_SIZE);
     size_t bytesread = 0;
+    if (len > 0) bytesread = len;
 #endif
 
 	for (size_t i = 0; i < DEVICE_PARAMS_CNT; i++)
@@ -452,6 +455,8 @@ int SaveDevParamsToNVM(void)
 #ifdef USE_SD_CARD
 	// Save device context to memory
 	if (!SDCardWriteDataFile("DEV", devParamsBuf, bias)) return 0;
+#else
+	MIC_Flash_Memory_Write((uint8_t*)devParamsBuf, DEV_PARAMS_BUF_SIZE);
 #endif
 
 #ifdef DISP_TIMING

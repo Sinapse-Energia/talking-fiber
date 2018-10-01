@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "Definitions.h"
-#include "Flash_NVM.h"
+#include "southbound_ec.h"
 #include "crc16.h"
 
 static void InitializeData(SharedMemoryData* data)
