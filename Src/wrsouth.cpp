@@ -32,7 +32,7 @@ char *Read_TFVOL(const char *value)
     // Enable Photodiode power
     HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_RESET);
-    HAL_Delay(100);
+    HAL_Delay(TF_PHOTO_POWER_DELAY_MSEC);
 
 	// Read ADC diode voltage
 	float pfm_to_analogue = adc_read_val(ADC_CHANNEL_6) * 1000; // in mV

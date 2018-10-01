@@ -20,6 +20,10 @@
 
 #define USE_STOPMODE
 
+// 100 msec delay after enabled photodiode power to set up voltage.
+// Generally this is time spent on the measurement
+#define TF_PHOTO_POWER_DELAY_MSEC   100
+
 #define SIZE_APN 60
 #define SIZE_MAIN_SERVER 60
 #define SIZE_NTP_SERVER 60
