@@ -130,6 +130,11 @@ char* Write_HourMinute(const char *value, const char *minuteName)
 	return (char*)value;
 }
 
+char *Write_TLSTH(const char *value)
+{
+    return Write_HourMinute(value, "TLSTM");
+}
+
 int Post_BTCFG()
 {
 	SharedMemoryData sharedData;
@@ -193,10 +198,34 @@ int Post_BTACT()
 	return 1;
 }
 
+int Post_CONLS()
+{
+    int LISEN = atoi(GetVariable((char*)"LISEN"));
+    int TLSTH = atoi(GetVariable((char*)"TLSTH"));
+    int TLSTM = atoi(GetVariable((char*)"TLSTM"));
+    int TLDUR = atoi(GetVariable((char*)"TLDUR"));
+    int TLRTN = atoi(GetVariable((char*)"TLRTN"));
+
+    if (LISEN < 0 || LISEN > 1 || TLSTH < 0 || TLSTH > 23 ||
+            TLSTM < 0 || TLSTM > 59 || TLDUR < 1 || TLDUR > 60 ||
+            TLRTN < 1 || TLRTN > 10)
+    {
+        // Error TODO need mechanism in context to restore variables
+        SetVariable((char*)"TLRES", (char*)"0");
+    }
+    else
+    {
+        SetVariable((char*)"TLRES", (char*)"1");
+    }
+
+    return 1;
+}
+
 // HOOK of functions to be called with a context variable is modified
 struct	st_wrapper	dispatch[] = {
 
 	"TFVOL",		Read_TFVOL,		NULL,
+	"TLSTH",        NULL,           Write_TLSTH,
 
 	NULL
 };
@@ -208,6 +237,7 @@ struct	st_fractions
 	"BTCFG",	NULL,			Post_BTCFG,
 	"BTACT",	NULL,			Post_BTACT,
 	"CHAPN",    NULL,           NEWCONN,
+	"CONLS",    NULL,           Post_CONLS,
 
 	NULL
 };

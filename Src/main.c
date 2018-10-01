@@ -247,7 +247,9 @@ void OnDemandHander()
         sprintf(outtopic, "%s/CMC/DEBUG", GetVariable("MTPRT"));
 
         if ((strlen(mssg) >= 4 && memcmp("207;", mssg, 4) == 0) ||
-            (strlen(mssg) >= 4 && memcmp("208;", mssg, 4) == 0))
+            (strlen(mssg) >= 4 && memcmp("208;", mssg, 4) == 0) ||
+            (strlen(mssg) >= 24 &&
+                    memcmp("L3_TF_CONF_LISTEN_STATE;", mssg, 24) == 0))
         {
             sprintf(outtopic, "%s/CMC/CONFIG", GetVariable("MTPRT"));
         }

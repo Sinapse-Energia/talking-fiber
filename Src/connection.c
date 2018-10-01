@@ -40,12 +40,12 @@ int	Connect(char *host, unsigned int port, char *user, char *password)
 			ok = true;
 
 			// Subscribe to AP actuation topic
-			sprintf(topic, "%s/CMC/ACT/%s", GetVariable("MTPRT"),
+			sprintf(topic, "%s/TF/ACT/%s", GetVariable("MTPRT"),
 					GetVariable("ID"));
 			if (MqttSubscribe(hconn, topic) < 0) ok = false;
 
 			// Subscribe to Global AP actuation topic
-			sprintf(topic, "%s/CMC/ACT/%s", GetVariable("MTPRT"),
+			sprintf(topic, "%s/TF/ACT/%s", GetVariable("MTPRT"),
 					GetVariable("DGRID"));
 			if (MqttSubscribe(hconn, topic) < 0) ok = false;
 

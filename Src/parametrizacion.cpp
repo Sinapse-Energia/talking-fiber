@@ -79,6 +79,13 @@ static const DevParam_T devParams[] = {
 		{ "TFPER",    DEFAULT_PERIOD,                   TYPE_INT },
 		{ "TFALM",    DEFAULT_ALERT_M,                  TYPE_INT },
 		{ "TFATH",    DEFAULT_ALERT_TH,                 TYPE_INT },
+
+		{ "LISEN",    "1",                              TYPE_INT },
+		{ "TLSTH",    "0",                              TYPE_INT },
+		{ "TLSTM",    "0",                              TYPE_INT },
+		{ "TLDUR",    "60",                             TYPE_INT },
+		{ "TLRTN",    "10",                             TYPE_INT },
+		{ "TLRES",    "0",                              TYPE_INT },
 };
 
 #define DEVICE_PARAMS_CNT (sizeof(devParams)/sizeof(devParams[0]))
@@ -326,6 +333,8 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 		"ERROR%999;$MSSG;Unknown message%Error%%",
 		"BTANS%607;$ID;$BTLRES;$BTLVER;$BTLSER;$BTLPRT;$BTLPRO;$BTLPAT;$BTLUSR;$BTLPAS;$BTLCNT;%Bootloader ans%%",
 
+		"CONLA%L3_TF_CONF_LISTEN_STATE_R;$ID;$TLRES;%listen state%%",
+
 		"L3TFR%L3_TF_STATUS_R;$ID;$TFVOL;$TFVTS;%return photodiode voltage%%",
 
 		NULL
@@ -338,6 +347,8 @@ int	 ReadMetadata(char *dominioIn, char *dominioOut){
 		"BTACT%208;$BTLAUS;$BTLAPS;%boot act%xx%BTANS%",
 		// 314 is done through main function
 		"CHAPN%175;$ANAME;%configure APN%%",
+
+		"CONLS%L3_TF_CONF_LISTEN_STATE;$LISEN;$TLSTH;$TLDUR;$TLRTN;%config listen%xx%CONLA%",
 
 		"L3TFD%L3_TF_STATUS_OD;%request diode voltage%xx%L3TFR%",
 
