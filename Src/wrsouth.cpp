@@ -63,8 +63,9 @@ char *Read_TFVOL(const char *value)
 	//float Iphotodiode = (VDD_PHOTODIODE/2 - pfm_to_analogue) / R_23_1;
 
     // Disable Photodiode power
+    HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_RESET);
+    HAL_Delay(1);
     HAL_GPIO_WritePin(EX_RESET_PHOTODIODE_GPIO_Port, EX_RESET_PHOTODIODE_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(nSHDN_GPIO_Port, nSHDN_Pin, GPIO_PIN_SET);
 
 	// Set timestamp
 	char tsbuf[16];
