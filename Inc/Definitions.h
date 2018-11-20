@@ -80,10 +80,10 @@
 /* ========================= TIME RELATED SETTINGS ========================== */
 
 // Uncomment this define to correct time with TIME server every hour
-//#define TIME_CORRECT_PERIODICALLY
+#define TIME_CORRECT_PERIODICALLY
 
 // Period in hours to execute time correction
-#define TIME_CORRECT_PERIOD_HOURS	6
+#define TIME_CORRECT_PERIOD_HOURS	24
 
 // Comment to disable receiving time from TIME server in WLAN mode
 #define WLAN_USE_TIME_SERVER

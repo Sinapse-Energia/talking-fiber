@@ -142,6 +142,7 @@ int today = 0; // Current day, used for sunrise/sunset calculation
 int prevMinute = 0, prevHour = 0;
 #if defined(TIME_CORRECT_PERIODICALLY)
 int lastTimeCorrectHour = 0;
+int cntTimeCorrectHour = 0;
 #endif
 
 volatile bool reconnectScheduled = false;
@@ -721,11 +722,19 @@ int main(void)
       }
 
 #if defined(TIME_CORRECT_PERIODICALLY)
-      if (lastTimeCorrectHour != nowHour &&
-              (nowHour % TIME_CORRECT_PERIOD_HOURS) == 0)
+      if (lastTimeCorrectHour != nowHour)
       {
           lastTimeCorrectHour = nowHour;
-          // TODO correct time with server
+
+          cntTimeCorrectHour++;
+          if (cntTimeCorrectHour >= TIME_CORRECT_PERIOD_HOURS)
+          {
+              cntTimeCorrectHour = 0;
+
+              Modem_preinit();
+              transport_get_time();
+              Disconnect();
+          }
       }
 #endif
   }
